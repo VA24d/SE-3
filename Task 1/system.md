@@ -118,7 +118,7 @@ SyncSpace is decomposed into **five main subsystems**. Each subsystem has clear 
 │                     CLIENT                           │
 │                                                      │
 │  ┌──────────────┐    edits    ┌──────────────┐       │
-│  │   Editor     │◄──────────►│  CRDT Engine │       │
+│  │   Editor     │◄──────────► │  CRDT Engine │       │
 │  │  Frontend    │   updates   │   (Yjs)      │       │
 │  └──────┬───────┘             └──────┬───────┘       │
 │         │ cursor                     │ CRDT vectors  │
