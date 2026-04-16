@@ -5,10 +5,8 @@ https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions
 
  a short text file in a format similar to an Alexandrian pattern. 
 
-
  We will keep ADRs in the project repository under doc/arch/adr-NNN.md
  Will be placed in 2 locations Implementation/doc/arch and Task 2/ADR
-
 
 ADRs will be numbered sequentially and monotonically. Numbers will not be reused.
 
