@@ -37,7 +37,10 @@ class SimpleProvider {
     this.statusText = document.getElementById('connection-status');
     this.statusDot = document.getElementById('connection-dot');
 
+    this._connected = false;
+
     this.ws.onopen = () => {
+      this._connected = true;
       this.statusText.textContent = 'Connected';
       this.statusDot.classList.add('connected');
       
@@ -50,13 +53,22 @@ class SimpleProvider {
       );
     };
 
+    this.ws.onerror = () => {
+      this.statusText.textContent = 'Connection error';
+      this.statusDot.classList.remove('connected');
+    };
+
     this.ws.onclose = () => {
       this.statusText.textContent = 'Disconnected';
       this.statusDot.classList.remove('connected');
-      // Reconnect with backoff in a real app, keeping it simple here
-      setTimeout(() => {
-        window.location.reload();
-      }, 5000);
+      // Clean up awareness so other peers remove our cursor/name
+      awarenessProtocol.removeAwarenessStates(this.awareness, [this.doc.clientID], this);
+      // Only auto-reconnect if we were previously connected (prevents infinite reload loops)
+      if (this._connected) {
+        setTimeout(() => {
+          window.location.reload();
+        }, 5000);
+      }
     };
 
     this._sendDocUpdate = (update) => {
