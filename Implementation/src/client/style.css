@@ -110,7 +110,7 @@ body {
 .main-container {
   display: flex;
   flex: 1;
-  min-height: 0;
+  height: calc(100vh - 64px);
 }
 
 .sidebar {
