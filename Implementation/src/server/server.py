@@ -92,7 +92,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 else:
                     continue
 
-                # Broadcast to peers
+                # Broadcast to peers (collect dead peers to remove)
+                dead_peers = set()
                 for client in sessions[session_id]:
                     if client != websocket:
                         try:
@@ -102,6 +103,8 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                                 await client.send_text(data)
                         except Exception as e:
                             logger.error(f"Error sending to peer: {e}")
+                            dead_peers.add(client)
+                sessions[session_id] -= dead_peers
             except Exception as e:
                 logger.error(f"Error in message loop: {e}")
                 break
