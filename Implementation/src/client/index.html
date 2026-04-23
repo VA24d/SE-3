@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncSpace - Collaborative Editor</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <script type="importmap">
+    {
+      "imports": {
+        "yjs": "https://esm.sh/yjs@13.6.14",
+        "y-protocols/awareness": "https://esm.sh/y-protocols@1.0.6/awareness",
+        "y-codemirror.next": "https://esm.sh/y-codemirror.next@0.3.5?deps=yjs@13.6.14,y-protocols@1.0.6",
+        "@codemirror/state": "https://esm.sh/@codemirror/state",
+        "codemirror": "https://esm.sh/codemirror",
+        "@codemirror/lang-javascript": "https://esm.sh/@codemirror/lang-javascript",
+        "@codemirror/theme-one-dark": "https://esm.sh/@codemirror/theme-one-dark"
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <header class="top-bar">
+    <div class="brand">
+      <div class="brand-icon"></div>
+      SyncSpace
+    </div>
+    <div class="session-info">
+      <div class="status-indicator">
+        <div id="connection-dot" class="dot"></div>
+        <span id="connection-status">Connecting...</span>
+      </div>
+      <button class="share-btn" id="share-btn">Share Link</button>
+    </div>
+  </header>
+
+  <main class="main-container">
+    <aside class="sidebar">
+      <div>
+        <h3>Participants</h3>
+        <div id="participants-list" class="participants-list">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </aside>
+
+    <div class="editor-wrapper" id="editor">
+      <!-- CodeMirror instance will be mounted here -->
+    </div>
+  </main>
+
+  <div id="toast">Copied to clipboard!</div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

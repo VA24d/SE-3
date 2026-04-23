@@ -12,10 +12,10 @@ SyncSpace is decomposed into **five main subsystems**. Each subsystem has clear 
 - Hosts the code editor component (CodeMirror / Monaco) with syntax highlighting, line numbers, and standard editor features
 - Renders remote users' cursors and selections as colored overlays
 - Displays the participant list and connection status indicator
-- Provides UI controls for creating/joining sessions (session ID input, share link button)
+- Provides UI controls for sessions: **new session** via redirect from `/`, **join** via shared URL / query parameter, **Share link** copies the current URL
 - Captures local edit operations and forwards them to the CRDT Engine
 
-**Key Technologies:** HTML/CSS/JavaScript, CodeMirror 6 (or Monaco Editor)
+**Key Technologies:** HTML/CSS/JavaScript, **CodeMirror 6** (prototype)
 
 **Interfaces:**
 - → CRDT Engine: passes local edit operations, receives remote operations for rendering
@@ -51,21 +51,19 @@ SyncSpace is decomposed into **five main subsystems**. Each subsystem has clear 
 **Role:** Provides the real-time bidirectional transport layer between clients and the relay server.
 
 **Functionality:**
-- Establishes and maintains a persistent WebSocket connection (WSS) between each client and the relay server
-- Transmits CRDT update vectors from the local client to the server for broadcast
-- Receives CRDT updates from other clients (relayed by the server) and delivers them to the CRDT Engine
-- Transmits and receives awareness data (cursor positions, user info) on a separate logical channel
-- Implements heartbeat/ping-pong for connection health monitoring
-- Handles automatic reconnection with exponential backoff on connection loss
+- Establishes and maintains a persistent WebSocket connection (**`ws://` in development**; **WSS** in production) between each client and the relay server
+- Transmits **prefixed** binary frames: **document** updates (`0x00` + Yjs update) and **awareness** updates (`0x01` + awareness payload); optional **JSON** control messages (e.g. `request_state`) for peer-driven catch-up
+- Receives the same from peers **via the relay** and delivers them to the CRDT Engine / Awareness layer
+- **Prototype:** on unexpected disconnect, the client uses a **simple timed page reload** rather than a full exponential-backoff policy
 
-**Key Technologies:** WebSocket API (browser-side), `ws` library (server-side), `y-websocket` (Yjs WebSocket provider)
+**Key Technologies:** Browser **WebSocket API**; **custom `SimpleProvider`** in the client; server uses **FastAPI** WebSockets
 
 **Interfaces:**
 - ↔ CRDT Engine: transports CRDT update vectors
 - ↔ Awareness Module: transports cursor/presence data
 - ↔ Relay Server: the network endpoint
 
-**Architectural Significance:** This subsystem directly addresses NFR-P-01 (≤ 1s E2E latency) by using persistent WebSocket connections instead of HTTP polling. It also enables NFR-R-02 (reconnection ≤ 5s) through incremental state-vector-based resynchronization.
+**Architectural Significance:** This subsystem directly addresses NFR-P-01 (≤ 1s E2E latency under normal conditions) by using a **full-duplex** WebSocket instead of HTTP polling. **Catch-up after join or disconnect** is handled by **Yjs state exchange between peers** (full update via `encodeStateAsUpdate` / `applyUpdate`), not by interpreting updates on the relay.
 
 ---
 
@@ -74,13 +72,12 @@ SyncSpace is decomposed into **five main subsystems**. Each subsystem has clear 
 **Role:** Acts as a lightweight, stateless message router that forwards CRDT updates and awareness data between connected clients within a session.
 
 **Functionality:**
-- Accepts WebSocket connections from clients and groups them by session ID
-- Forwards (broadcasts) CRDT update vectors from any client to all other clients in the same session
-- Forwards awareness protocol messages for cursor/presence synchronization
-- Maintains minimal session state: connected client list and the latest CRDT document state for new-joiner sync
-- Manages session lifecycle: creation (when first client connects), teardown (when last client disconnects after a timeout period)
+- Accepts WebSocket connections from clients and groups them by **session ID** (path parameter)
+- Forwards (**broadcasts**) each received **text or binary** frame to **all other** sockets in that session **unchanged**
+- Does **not** parse Yjs or awareness payloads; does **not** store the document
+- Maintains **only** an in-memory **set of active WebSockets per session**; when the last peer leaves, the session entry is removed
 
-**Key Technologies:** Node.js, `ws` library, `y-websocket` server utility
+**Key Technologies:** **Python 3**, **FastAPI**, **Uvicorn** (ASGI server)
 
 **Interfaces:**
 - ↔ Communication Subsystem (each client): WebSocket connections
@@ -100,7 +97,7 @@ SyncSpace is decomposed into **five main subsystems**. Each subsystem has clear 
 - Remote awareness states are rendered as colored cursor markers and selection highlights in the editor
 - Detects user timeout/disconnection and removes stale awareness entries
 
-**Key Technologies:** Yjs Awareness Protocol (built into `y-websocket`)
+**Key Technologies:** **Yjs Awareness** (`y-protocols/awareness`), transported over the same WebSocket as document updates with a **distinct prefix**
 
 **Interfaces:**
 - → Editor Frontend: provides remote cursor/selection data for rendering
@@ -132,7 +129,7 @@ SyncSpace is decomposed into **five main subsystems**. Each subsystem has clear 
                                        │ WSS
                               ┌────────▼────────┐
                               │  Relay Server   │
-                              │  (Node.js)      │
+                              │  (FastAPI)      │
                               │  - broadcast    │
                               │  - session mgmt │
                               └────────┬────────┘
