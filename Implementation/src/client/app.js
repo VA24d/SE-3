@@ -37,10 +37,7 @@ class SimpleProvider {
     this.statusText = document.getElementById('connection-status');
     this.statusDot = document.getElementById('connection-dot');
 
-    this._connected = false;
-
     this.ws.onopen = () => {
-      this._connected = true;
       this.statusText.textContent = 'Connected';
       this.statusDot.classList.add('connected');
       
@@ -53,26 +50,16 @@ class SimpleProvider {
       );
     };
 
-    this.ws.onerror = () => {
-      this.statusText.textContent = 'Connection error';
-      this.statusDot.classList.remove('connected');
-    };
-
     this.ws.onclose = () => {
       this.statusText.textContent = 'Disconnected';
       this.statusDot.classList.remove('connected');
-      // Clean up awareness so other peers remove our cursor/name
-      awarenessProtocol.removeAwarenessStates(this.awareness, [this.doc.clientID], this);
-      // Only auto-reconnect if we were previously connected (prevents infinite reload loops)
-      if (this._connected) {
-        setTimeout(() => {
-          window.location.reload();
-        }, 5000);
-      }
+      // Reconnect with backoff in a real app, keeping it simple here
+      setTimeout(() => {
+        window.location.reload();
+      }, 5000);
     };
 
     this._sendDocUpdate = (update) => {
-      if (this.ws.readyState !== WebSocket.OPEN) return;
       const msg = new Uint8Array(update.length + 1);
       msg[0] = 0;
       msg.set(update, 1);
@@ -80,7 +67,6 @@ class SimpleProvider {
     };
 
     this._sendAwarenessUpdate = (update) => {
-      if (this.ws.readyState !== WebSocket.OPEN) return;
       const msg = new Uint8Array(update.length + 1);
       msg[0] = 1;
       msg.set(update, 1);
@@ -135,6 +121,20 @@ class SimpleProvider {
         awarenessProtocol.encodeAwarenessUpdate(this.awareness, changedClients)
       );
     });
+
+    // Clean up awareness on page unload so peers instantly drop us
+    window.addEventListener('beforeunload', () => {
+      awarenessProtocol.removeAwarenessStates(this.awareness, [this.doc.clientID], 'window unload');
+    });
+
+    // Heartbeat: re-broadcast our awareness every 15s so peers know we're alive.
+    this._heartbeat = setInterval(() => {
+      if (this.ws.readyState === WebSocket.OPEN) {
+        this._sendAwarenessUpdate(
+          awarenessProtocol.encodeAwarenessUpdate(this.awareness, [this.doc.clientID])
+        );
+      }
+    }, 15000);
   }
 }
 
@@ -147,9 +147,16 @@ if (!sessionId) {
 }
 
 // 1. Initialize Yjs CRDT Document & Awareness
-const ydoc = new Y.Doc();
+// Persist clientID in sessionStorage so reloads reuse the same identity
+// instead of appearing as a second ghost user.
+const SS_CLIENT_ID = 'syncspace-clientid';
+let storedClientId = Number(sessionStorage.getItem(SS_CLIENT_ID));
+if (!storedClientId || storedClientId <= 0) {
+  storedClientId = Math.floor(Math.random() * 2147483647);
+  sessionStorage.setItem(SS_CLIENT_ID, storedClientId);
+}
+const ydoc = new Y.Doc({ clientID: storedClientId });
 const ytext = ydoc.getText('codemirror');
-const ysettings = ydoc.getMap('settings');
 const awareness = new awarenessProtocol.Awareness(ydoc);
 
 // Generate random user info
@@ -205,43 +212,14 @@ const view = new EditorView({
   parent: document.getElementById('editor')
 });
 
-// Helper to apply a language key to the editor + dropdown
-let _currentLangKey = langKey;
-function applyLanguage(key) {
-  if (!LANG[key] || key === _currentLangKey) return;
-  _currentLangKey = key;
-  langSelect.value = key;
+langSelect.addEventListener('change', () => {
+  const key = langSelect.value;
+  if (!LANG[key]) return;
   localStorage.setItem(LS_LANG, key);
   view.dispatch({
     effects: languageConf.reconfigure(LANG[key]())
   });
-}
-
-// When the local user changes the dropdown, write to the shared Y.Map
-langSelect.addEventListener('change', () => {
-  const key = langSelect.value;
-  if (!LANG[key]) return;
-  ysettings.set('language', key);
 });
-
-// Observe the shared Y.Map so remote language changes are applied locally
-ysettings.observe((event) => {
-  if (event.keysChanged.has('language')) {
-    const remoteLang = ysettings.get('language');
-    if (remoteLang && LANG[remoteLang]) {
-      applyLanguage(remoteLang);
-    }
-  }
-});
-
-// If the shared map already has a language (we joined an existing session), adopt it
-const existingLang = ysettings.get('language');
-if (existingLang && LANG[existingLang]) {
-  applyLanguage(existingLang);
-} else {
-  // First user in the session — seed the shared language
-  ysettings.set('language', langKey);
-}
 
 const toast = document.getElementById('toast');
 
