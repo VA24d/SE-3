@@ -20,34 +20,33 @@ The following architectural tactics are employed in SyncSpace to address specifi
 
 ---
 
-## Tactic 2: Heartbeat-Based Failure Detection
+## Tactic 2: Fast Failure Detection and Recovery (Prototype Profile)
 
-**NFR Addressed:** NFR-R-02 (Client reconnection ≤ 5 seconds), NFR-P-03 (Convergence ≤ 2s)
+**NFR Addressed:** NFR-R-02 (Client reconnection within a few seconds — **target** in SRS), fault visibility (FR-UI-03 area)
 
-**Description:** The system uses periodic heartbeat (ping/pong) messages between clients and the relay server to detect connection failures quickly. If a heartbeat response is not received within a configured timeout, the connection is declared dead and reconnection logic is triggered.
+**Description:** The transport must detect dead connections so the UI can reflect **disconnected** state and users can recover. In the **prototype**, we rely on the **WebSocket’s built-in close semantics** and a **simple reload-based recovery** rather than a custom application heartbeat protocol.
 
-**How it works in SyncSpace:**
-- The WebSocket layer sends a ping frame every 2 seconds.
-- If no pong is received within 3 seconds, the connection is considered lost.
-- The client immediately enters reconnection mode with exponential backoff (1s, 2s, 4s, capped at 10s).
-- On reconnection, the client sends its CRDT state vector to the relay, and the relay responds with only the missing updates (incremental sync).
+**How it works in SyncSpace (as implemented):**
+- When the socket closes, the client shows **Disconnected** and schedules a **full page reload** after a short delay (5 seconds), which re-establishes a session from the URL and re-runs the Yjs + provider bootstrap.
+- **Join / catch-up:** Peers answer a JSON `request_state` message by sending a **full Yjs update** (`encodeStateAsUpdate`) so a reloaded or new tab can converge without the server storing the document.
+- **Production / future work:** The SRS-style **application heartbeats** and **exponential backoff** can replace the reload stub without changing the relay’s forwarding role.
 
-**Trade-off:** Heartbeats add a small amount of network overhead (a few bytes every 2 seconds). This is negligible compared to the benefit of fast failure detection.
+**Trade-off:** A full reload is heavier than incremental reconnect but is **simple and robust** for a semester prototype and keeps the client provider small.
 
 ---
 
-## Tactic 3: Incremental State Synchronization (State Vector Exchange)
+## Tactic 3: Peer-Assisted State Catch-Up (Yjs State Encoding)
 
-**NFR Addressed:** NFR-R-01 (100% convergence after partition), NFR-R-02 (Reconnection ≤ 5s)
+**NFR Addressed:** NFR-R-01 (100% convergence — **CRDT guarantee**), NFR-R-02 (timely resync after reconnect / new joiner)
 
-**Description:** Instead of transferring the entire document on every reconnection or new-joiner event, SyncSpace uses Yjs state vectors — compact summaries of which operations a replica has already seen. The relay compares the client's state vector against its own and sends back only the missing operations.
+**Description:** New or reconnecting replicas must obtain missing operations. **Yjs** can exchange **full encoded updates** or **differential** updates when peers compare state vectors. Our **relay does not participate** in that logic—it only delivers frames.
 
-**How it works in SyncSpace:**
-1. Client reconnects and sends its state vector (a small binary blob, typically < 1 KB).
-2. Relay computes the diff: `missingUpdates = relay.encodeStateAsUpdate(clientStateVector)`.
-3. Only the missing updates are transmitted, not the full document.
+**How it works in SyncSpace (as implemented):**
+1. A joiner connects and sends a JSON **`request_state`** message on the WebSocket.
+2. Each existing peer responds with one or more **`0x00`-prefixed** binary messages containing **`Y.encodeStateAsUpdate(doc)`** (full snapshot from that peer’s replica; Yjs merges redundant responses safely).
+3. Awareness is similarly prefixed (`0x01`) so cursors converge after document text.
 
-**Trade-off:** The relay must maintain an in-memory copy of the latest CRDT state per session to compute diffs. This uses memory proportional to the document size, but avoids the bandwidth cost of full retransmission on every reconnect.
+**Trade-off:** Broadcast-style catch-up can send **more bytes** than a perfect server-side diff when many peers reply at once, but it preserves **ADR-004** (no document authority on the server) and stays correct for small sessions.
 
 ---
 
@@ -73,9 +72,9 @@ The following architectural tactics are employed in SyncSpace to address specifi
 **Description:** The relay server is intentionally kept stateless with respect to edit logic. It does not parse, validate, or transform any document operations. It merely forwards binary CRDT update vectors between clients. This minimizes server complexity and eliminates the server as a correctness bottleneck.
 
 **How it works in SyncSpace:**
-- The relay receives a binary blob from Client A on a session channel.
-- It broadcasts the blob unchanged to all other clients on the same channel.
-- It maintains an in-memory Yjs document per session solely for new-joiner sync — it never modifies this document based on its own logic.
+- The relay receives a binary (or text) frame from Client A on a session channel.
+- It broadcasts the frame **unchanged** to all **other** clients on the same channel.
+- It keeps **only** the set of open sockets per session—**no Y.Doc**, no persistence.
 
 **Trade-off:** The relay has no ability to enforce application-level rules (e.g., "this user is read-only") because it does not inspect message content. Access control must be enforced at the connection level (allowing or rejecting the WebSocket connection) rather than at the operation level.
 
@@ -86,7 +85,7 @@ The following architectural tactics are employed in SyncSpace to address specifi
 | Tactic | NFRs Addressed |
 |--------|---------------|
 | Local-First Optimistic Replication | NFR-P-01, NFR-P-02 |
-| Heartbeat-Based Failure Detection | NFR-R-02, NFR-P-03 |
-| Incremental State Synchronization | NFR-R-01, NFR-R-02 |
+| Fast Failure Detection and Recovery (Prototype Profile) | NFR-R-02, NFR-P-03 (targets) |
+| Peer-Assisted State Catch-Up (Yjs State Encoding) | NFR-R-01, NFR-R-02 |
 | Separation of Persistent/Ephemeral State | NFR-P-01, NFR-SC-01 |
 | Stateless Relay | NFR-R-02, Deployment simplicity |
