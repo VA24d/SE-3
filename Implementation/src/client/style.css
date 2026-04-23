@@ -25,7 +25,7 @@ body {
     radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15), transparent 25%),
     radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.15), transparent 25%);
   color: var(--text-primary);
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -124,6 +124,9 @@ body {
   flex-direction: column;
   gap: 1.5rem;
   transition: transform 0.3s ease;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
 }
 
 .sidebar h3 {
@@ -133,6 +136,82 @@ body {
   color: var(--text-secondary);
   font-weight: 600;
   margin-bottom: 0.75rem;
+}
+
+.select-input {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid var(--panel-border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.select-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.field-label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.45rem;
+}
+
+.inline-control {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.text-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid var(--panel-border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.text-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.mini-btn {
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mini-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.checkbox-row {
+  margin-top: 0.7rem;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--text-secondary);
+  font-size: 0.825rem;
+  cursor: pointer;
+}
+
+.checkbox-row input {
+  accent-color: var(--accent);
 }
 
 .participants-list {
@@ -176,8 +255,9 @@ body {
 /* Editor Area */
 .editor-wrapper {
   flex: 1;
+  min-width: 0;
   position: relative;
-  overflow: hidden;
+  overflow: auto;
   display: flex;
   flex-direction: column;
 }
@@ -198,6 +278,7 @@ body {
 
 .cm-scroller {
   font-family: 'Fira Code', 'JetBrains Mono', monospace !important;
+  overflow: auto !important;
 }
 
 .cm-gutters {
@@ -247,6 +328,10 @@ body {
 }
 
 .yjs-cursor:hover > div {
+  opacity: 1;
+}
+
+body.show-cursor-names .yjs-cursor > div {
   opacity: 1;
 }
 
