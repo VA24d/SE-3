@@ -17,6 +17,9 @@ SyncSpace is a **real-time collaborative code editor** prototype. Multiple users
 | `Implementation/doc/arch/` | ADRs aligned with the implementation |
 | `Implementation/requirements.txt` | Python dependencies |
 | `Implementation/tests/` | Smoke and latency/throughput checks |
+| `Implementation/start.sh` | One-command start on macOS / Linux |
+| `Implementation/start.ps1` | One-command start on Windows (PowerShell) |
+| `Implementation/Makefile` | Cross-platform tasks: `make install`, `make start`, tests |
 | `Task 1/` | Requirements (SRS) and subsystem overview |
 | `Task 2/` | Stakeholders (IEEE 42010) and ADRs |
 | `Task 3/` | Architectural tactics and design patterns |
@@ -61,6 +64,41 @@ pip install -r requirements.txt
 
 ## Run the application
 
+### Make (Windows, macOS, Linux)
+
+Requires **GNU Make** and **Python** on the `PATH` (`python` on Windows, `python3` on macOS/Linux).
+
+From **`Implementation/`**:
+
+```bash
+make install
+make start
+```
+
+On **Windows**, use **PowerShell** or **cmd** from the `Implementation` folder; if `make` is missing, install it (e.g. `choco install make`, **Scoop**, or use **Git Bash** / **WSL** which ship with `make`).
+
+Override the port: `make start SYNCSPACE_PORT=9000`.
+
+### Quick start (shell scripts)
+
+From **`Implementation/`** after venv + `pip install` (see above):
+
+**macOS / Linux:**
+
+```bash
+./start.sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+.\start.ps1
+```
+
+This listens on **all interfaces** (`0.0.0.0`), prints **127.0.0.1** and **LAN** URLs, and starts the server. Override the port: `SYNCSPACE_PORT=9000 ./start.sh` or `$env:SYNCSPACE_PORT="9000"; .\start.ps1`.
+
+### Manual start
+
 The server must be started with working directory `Implementation/src/server` so static files resolve to `../client`.
 
 **macOS / Linux:**
@@ -78,6 +116,27 @@ cd Implementation\src\server
 ```
 
 Then open **[http://127.0.0.1:8080/](http://127.0.0.1:8080/)**. You are redirected to `/app/?session=…`. Open the same URL (or use **Share link**) in another window to collaborate in the same session.
+
+### Other devices on your Wi‑Fi / LAN
+
+By default the server listens only on **localhost** (`127.0.0.1`), so **phones and other computers cannot connect**.
+
+To allow same-network access, start with **`SYNCSPACE_HOST=0.0.0.0`** (listen on all interfaces), then on the other device open **`http://<your-computer’s-LAN-IP>:8080/`** (for example `http://192.168.1.42:8080/`). The page and WebSocket URLs use whatever host you opened, so collaboration works as long as firewalls allow **TCP 8080**.
+
+**macOS / Linux:**
+
+```bash
+cd Implementation/src/server
+SYNCSPACE_HOST=0.0.0.0 ../../.venv/bin/python server.py
+```
+
+**Windows (PowerShell):**
+
+```powershell
+cd Implementation\src\server
+$env:SYNCSPACE_HOST="0.0.0.0"
+..\..\.venv\Scripts\python.exe server.py
+```
 
 ---
 

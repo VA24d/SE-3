@@ -2,8 +2,12 @@
 SyncSpace relay: HTTP entry (redirect + static client) and WebSocket broadcast per session.
 
 Run from this directory so StaticFiles resolves ../client. See repository README.md.
+
+Listen address: set SYNCSPACE_HOST=0.0.0.0 to accept connections from other devices on
+your LAN (then open http://<this-machine-LAN-IP>:8080/ on them). Default is 127.0.0.1.
 """
 import logging
+import os
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
@@ -74,4 +78,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8080)
+
+    host = os.environ.get("SYNCSPACE_HOST", "127.0.0.1")
+    port = int(os.environ.get("SYNCSPACE_PORT", "8080"))
+    uvicorn.run(app, host=host, port=port)

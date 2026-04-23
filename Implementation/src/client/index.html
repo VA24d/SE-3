@@ -14,7 +14,9 @@
         "y-codemirror.next": "https://esm.sh/y-codemirror.next@0.3.5?deps=yjs@13.6.14,y-protocols@1.0.6",
         "@codemirror/state": "https://esm.sh/@codemirror/state",
         "codemirror": "https://esm.sh/codemirror",
-        "@codemirror/lang-javascript": "https://esm.sh/@codemirror/lang-javascript",
+        "@codemirror/lang-python": "https://esm.sh/@codemirror/lang-python",
+        "@codemirror/lang-java": "https://esm.sh/@codemirror/lang-java",
+        "@codemirror/lang-cpp": "https://esm.sh/@codemirror/lang-cpp",
         "@codemirror/theme-one-dark": "https://esm.sh/@codemirror/theme-one-dark"
       }
     }
@@ -38,7 +40,32 @@
 
   <main class="main-container">
     <aside class="sidebar">
-      <div>
+      <div class="sidebar-section">
+        <h3>Your name</h3>
+        <input type="text" id="display-name" class="text-input" maxlength="40" placeholder="Display name" autocomplete="nickname" />
+      </div>
+      <div class="sidebar-section">
+        <h3>Files</h3>
+        <button type="button" id="add-file-btn" class="mini-btn">+ Add file</button>
+        <div id="file-list" class="file-list-wrap"></div>
+        <p class="hint">Paths can include folders (<code>src/main.c</code>). Shared for everyone in this session.</p>
+      </div>
+      <div class="sidebar-section">
+        <h3>Syntax</h3>
+        <select id="language-select" class="select-input" aria-label="Syntax highlighting language">
+          <option value="python">Python</option>
+          <option value="java">Java</option>
+          <option value="c">C</option>
+        </select>
+      </div>
+      <div class="sidebar-section">
+        <h3>Cursors</h3>
+        <label class="toggle-row">
+          <input type="checkbox" id="show-cursor-names" />
+          <span class="toggle-label">Show collaborator name above cursor</span>
+        </label>
+      </div>
+      <div class="sidebar-section">
         <h3>Participants</h3>
         <div id="participants-list" class="participants-list">
           <!-- Populated by JS -->
