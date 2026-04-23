@@ -7,10 +7,23 @@ import * as Y from 'yjs';
 import { yCollab } from 'y-codemirror.next';
 import * as awarenessProtocol from 'y-protocols/awareness';
 
-import { EditorState } from '@codemirror/state';
+import { EditorState, Compartment } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
-import { javascript } from '@codemirror/lang-javascript';
+import { python } from '@codemirror/lang-python';
+import { java } from '@codemirror/lang-java';
+import { cpp } from '@codemirror/lang-cpp';
 import { oneDark } from '@codemirror/theme-one-dark';
+
+const LS_LANG = 'syncspace-language';
+const LS_DISPLAY_NAME = 'syncspace-display-name';
+const LS_SHOW_CURSOR_NAMES = 'syncspace-show-cursor-names';
+const MAX_DISPLAY_NAME_LENGTH = 24;
+
+const LANG = {
+  python: () => python(),
+  cpp: () => cpp(),
+  java: () => java()
+};
 
 // Simple Custom WebSocket Provider to communicate with our stateless Python relay server
 class SimpleProvider {
@@ -127,10 +140,23 @@ const awareness = new awarenessProtocol.Awareness(ydoc);
 // Generate random user info
 const colors = ['#f87171', '#fb923c', '#fbbf24', '#34d399', '#38bdf8', '#818cf8', '#a78bfa', '#f472b6'];
 const randomColor = colors[Math.floor(Math.random() * colors.length)];
+const savedDisplayName = (localStorage.getItem(LS_DISPLAY_NAME) || '').trim();
 const randomName = 'User_' + Math.floor(Math.random() * 1000);
+const initialDisplayName = savedDisplayName || randomName;
+
+function sanitizeDisplayName(raw) {
+  const normalized = String(raw || '').trim().replace(/\s+/g, ' ');
+  return normalized.slice(0, MAX_DISPLAY_NAME_LENGTH);
+}
+
+function getDefaultShareUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.set('session', sessionId);
+  return url.toString();
+}
 
 awareness.setLocalStateField('user', {
-  name: randomName,
+  name: initialDisplayName,
   color: randomColor,
   colorLight: randomColor + '33'
 });
@@ -140,12 +166,20 @@ const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const wsUrl = `${wsProto}//${window.location.host}/ws/${sessionId}`;
 const provider = new SimpleProvider(wsUrl, ydoc, awareness);
 
+const languageConf = new Compartment();
+const langSelect = document.getElementById('language-select');
+const savedLang = localStorage.getItem(LS_LANG);
+if (savedLang && LANG[savedLang]) {
+  langSelect.value = savedLang;
+}
+
 // 3. Initialize CodeMirror Editor
+const langKey = langSelect.value in LANG ? langSelect.value : 'python';
 const state = EditorState.create({
   doc: ytext.toString(),
   extensions: [
     basicSetup,
-    javascript(),
+    languageConf.of(LANG[langKey]()),
     oneDark,
     yCollab(ytext, provider.awareness, { undoManager: new Y.UndoManager(ytext) })
   ]
@@ -156,13 +190,139 @@ const view = new EditorView({
   parent: document.getElementById('editor')
 });
 
-// 4. Update UI Components
-const shareBtn = document.getElementById('share-btn');
-shareBtn.addEventListener('click', () => {
-  navigator.clipboard.writeText(window.location.href);
-  const toast = document.getElementById('toast');
+langSelect.addEventListener('change', () => {
+  const key = langSelect.value;
+  if (!LANG[key]) return;
+  localStorage.setItem(LS_LANG, key);
+  view.dispatch({
+    effects: languageConf.reconfigure(LANG[key]())
+  });
+});
+
+const toast = document.getElementById('toast');
+
+function showToast(message, durationMs = 2000, restoreText = 'Copied to clipboard!') {
+  toast.textContent = message;
   toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 2000);
+  setTimeout(() => {
+    toast.classList.remove('show');
+    toast.textContent = restoreText;
+  }, durationMs);
+}
+
+function setDisplayName(nextName) {
+  const cleanName = sanitizeDisplayName(nextName);
+  if (!cleanName) return false;
+  const localState = awareness.getLocalState() || {};
+  const user = localState.user || {};
+  awareness.setLocalStateField('user', {
+    ...user,
+    name: cleanName
+  });
+  localStorage.setItem(LS_DISPLAY_NAME, cleanName);
+  return true;
+}
+
+// Clipboard API only works in a secure context (https / localhost). LAN http://IP needs execCommand fallback.
+function copyToClipboard(text) {
+  if (window.isSecureContext && navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise((resolve, reject) => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;left:0;top:0;width:2em;height:2em;opacity:0;';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    let ok = false;
+    try {
+      ok = document.execCommand('copy');
+    } finally {
+      document.body.removeChild(ta);
+    }
+    if (ok) resolve();
+    else reject(new Error('copy'));
+  });
+}
+
+// 4. Update UI Components — share uses server-built URL (LAN IP + port + /app/?session=…) so 127.0.0.1 is not copied
+const shareBtn = document.getElementById('share-btn');
+let shareUrl = getDefaultShareUrl();
+
+async function refreshShareUrl() {
+  try {
+    const res = await fetch(`/api/share-link?session=${encodeURIComponent(sessionId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.url) {
+        shareUrl = data.url;
+        return;
+      }
+    }
+  } catch {
+    // Keep the default URL.
+  }
+  shareUrl = getDefaultShareUrl();
+}
+
+// Resolve the server-built share URL up front so clipboard write stays in the click gesture path.
+refreshShareUrl();
+
+shareBtn.addEventListener('click', async () => {
+  try {
+    await copyToClipboard(shareUrl);
+    showToast('Copied to clipboard!');
+  } catch {
+    window.prompt('Copy this link:', shareUrl);
+    showToast('Copy failed. Link shown for manual copy.');
+  }
+  refreshShareUrl();
+});
+
+const displayNameInput = document.getElementById('display-name-input');
+const renameBtn = document.getElementById('rename-btn');
+
+displayNameInput.value = initialDisplayName;
+
+renameBtn.addEventListener('click', () => {
+  const nextValue = displayNameInput.value;
+  if (setDisplayName(nextValue)) {
+    displayNameInput.value = sanitizeDisplayName(nextValue);
+    showToast('Display name updated');
+    updateParticipantsList();
+    return;
+  }
+  const currentName = awareness.getLocalState()?.user?.name || initialDisplayName;
+  displayNameInput.value = currentName;
+  showToast('Please enter a valid display name');
+});
+
+displayNameInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    renameBtn.click();
+  }
+});
+
+const showCursorNamesInput = document.getElementById('show-cursor-names');
+const storedShowCursorNames = localStorage.getItem(LS_SHOW_CURSOR_NAMES);
+const initialShowCursorNames = storedShowCursorNames === null
+  ? true
+  : storedShowCursorNames === '1';
+
+function applyCursorNameVisibility(showNames) {
+  document.body.classList.toggle('show-cursor-names', showNames);
+  localStorage.setItem(LS_SHOW_CURSOR_NAMES, showNames ? '1' : '0');
+}
+
+showCursorNamesInput.checked = initialShowCursorNames;
+applyCursorNameVisibility(initialShowCursorNames);
+
+showCursorNamesInput.addEventListener('change', () => {
+  applyCursorNameVisibility(showCursorNamesInput.checked);
 });
 
 // Participant List tracking
