@@ -9,6 +9,8 @@ import * as awarenessProtocol from 'y-protocols/awareness';
 
 import { EditorState, Compartment } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
+import { keymap } from '@codemirror/view';
+import { indentWithTab } from '@codemirror/commands';
 import { python } from '@codemirror/lang-python';
 import { java } from '@codemirror/lang-java';
 import { cpp } from '@codemirror/lang-cpp';
@@ -201,6 +203,7 @@ const state = EditorState.create({
   doc: ytext.toString(),
   extensions: [
     basicSetup,
+    keymap.of([indentWithTab]),
     languageConf.of(LANG[langKey]()),
     oneDark,
     yCollab(ytext, provider.awareness, { undoManager: new Y.UndoManager(ytext) })
