@@ -60,6 +60,7 @@ class SimpleProvider {
     };
 
     this._sendDocUpdate = (update) => {
+      if (this.ws.readyState !== WebSocket.OPEN) return;
       const msg = new Uint8Array(update.length + 1);
       msg[0] = 0;
       msg.set(update, 1);
@@ -67,6 +68,7 @@ class SimpleProvider {
     };
 
     this._sendAwarenessUpdate = (update) => {
+      if (this.ws.readyState !== WebSocket.OPEN) return;
       const msg = new Uint8Array(update.length + 1);
       msg[0] = 1;
       msg.set(update, 1);
@@ -135,6 +137,7 @@ if (!sessionId) {
 // 1. Initialize Yjs CRDT Document & Awareness
 const ydoc = new Y.Doc();
 const ytext = ydoc.getText('codemirror');
+const ysettings = ydoc.getMap('settings');
 const awareness = new awarenessProtocol.Awareness(ydoc);
 
 // Generate random user info
@@ -190,14 +193,43 @@ const view = new EditorView({
   parent: document.getElementById('editor')
 });
 
-langSelect.addEventListener('change', () => {
-  const key = langSelect.value;
-  if (!LANG[key]) return;
+// Helper to apply a language key to the editor + dropdown
+let _currentLangKey = langKey;
+function applyLanguage(key) {
+  if (!LANG[key] || key === _currentLangKey) return;
+  _currentLangKey = key;
+  langSelect.value = key;
   localStorage.setItem(LS_LANG, key);
   view.dispatch({
     effects: languageConf.reconfigure(LANG[key]())
   });
+}
+
+// When the local user changes the dropdown, write to the shared Y.Map
+langSelect.addEventListener('change', () => {
+  const key = langSelect.value;
+  if (!LANG[key]) return;
+  ysettings.set('language', key);
 });
+
+// Observe the shared Y.Map so remote language changes are applied locally
+ysettings.observe((event) => {
+  if (event.keysChanged.has('language')) {
+    const remoteLang = ysettings.get('language');
+    if (remoteLang && LANG[remoteLang]) {
+      applyLanguage(remoteLang);
+    }
+  }
+});
+
+// If the shared map already has a language (we joined an existing session), adopt it
+const existingLang = ysettings.get('language');
+if (existingLang && LANG[existingLang]) {
+  applyLanguage(existingLang);
+} else {
+  // First user in the session — seed the shared language
+  ysettings.set('language', langKey);
+}
 
 const toast = document.getElementById('toast');
 
