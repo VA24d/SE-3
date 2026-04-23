@@ -16,6 +16,9 @@ SyncSpace is a **real-time collaborative code editor** prototype. Multiple users
 | `Implementation/src/client/` | HTML/CSS/JS editor UI (ES modules + import maps) |
 | `Implementation/doc/arch/` | ADRs aligned with the implementation |
 | `Implementation/requirements.txt` | Python dependencies |
+| `Implementation/Makefile` | Cross-platform tasks (`make install`, `make start`, tests) |
+| `Implementation/start.sh` | One-command start on macOS / Linux (LAN + printed URLs) |
+| `Implementation/start.ps1` | One-command start on Windows (PowerShell) |
 | `Implementation/tests/` | Smoke and latency/throughput checks |
 | `Task 1/` | Requirements (SRS) and subsystem overview |
 | `Task 2/` | Stakeholders (IEEE 42010) and ADRs |
@@ -60,6 +63,29 @@ pip install -r requirements.txt
 ---
 
 ## Run the application
+
+### Make (Windows, macOS, Linux)
+
+Requires **GNU Make** and **Python** on the `PATH` (`python` on Windows, `python3` on macOS/Linux).
+
+From **`Implementation/`** after `make install` (or manual venv + `pip install -r requirements.txt`):
+
+```bash
+make install
+make start
+```
+
+`make start` listens on **all interfaces** (`SYNCSPACE_HOST=0.0.0.0`) and prints **127.0.0.1** and **LAN** URLs. Override port: `make start SYNCSPACE_PORT=9000`. Localhost only: `make start SYNCSPACE_HOST=127.0.0.1`.
+
+### Shell scripts
+
+From **`Implementation/`**:
+
+**macOS / Linux:** `./start.sh` (after `chmod +x start.sh` if needed)
+
+**Windows (PowerShell):** `.\start.ps1`
+
+### Manual run
 
 The server must be started with working directory `Implementation/src/server` so static files resolve to `../client`.
 
