@@ -4,10 +4,9 @@
 
 | ID    | Stakeholder           | Description                                                                                      |
 |-------|-----------------------|--------------------------------------------------------------------------------------------------|
-| SH-01 | End Users (Developers) | Software developers and students who use SyncSpace to collaboratively edit code in real time.    |
-| SH-02 | Instructors / Evaluators | Course staff evaluating the architectural rigor, correctness, and documentation of the project. |
-| SH-03 | Development Team       | The team of developers building and maintaining SyncSpace.                                      |
-| SH-04 | System Administrator   | The person responsible for deploying and operating the relay server infrastructure.              |
+| SH-01 | End Users (Developers)    | Software developers and students who use SyncSpace to collaboratively edit code in real time.    |
+| SH-02 | Development Team (team 33)| The team of developers building and maintaining SyncSpace.                                      |
+| SH-03 | System Administrator      | The person responsible for deploying and operating the relay server infrastructure.              |
 
 ---
 
@@ -67,8 +66,8 @@ The system is decomposed into **per-browser** editor, CRDT, and WebSocket client
 ```
    User A's Browser                                User B's Browser
   ┌─────────────────┐                             ┌─────────────────┐
-  │ Editor Frontend  │                             │ Editor Frontend  │
-  │  (CodeMirror 6)  │                             │  (CodeMirror 6)  │
+  │ Editor Frontend │                             │ Editor Frontend │
+  │  (CodeMirror)   │                             │  (CodeMirror)   │
   └────────┬────────┘                             └────────┬────────┘
            │ local edits                                    │
   ┌────────▼────────┐                             ┌────────▼────────┐
