@@ -105,6 +105,13 @@ cd Implementation\src\server
 
 Then open **[http://127.0.0.1:8080/](http://127.0.0.1:8080/)**. You are redirected to `/app/?session=…`. Open the same URL (or use **Share link**) in another window to collaborate in the same session.
 
+For a **two-system** test, the person running the server can share the session URL shown by the **Share link** button or by `GET /api/share-link?session=...`. On the other machine, run the benchmark against that URL to print live relay numbers:
+
+```bash
+cd Implementation
+python tests/benchmark_nfr.py --session-url "http://HOST:PORT/app/?session=SESSION_ID"
+```
+
 ---
 
 ## Automated checks
@@ -118,6 +125,8 @@ python tests/benchmark_nfr.py
 ```
 
 `ws_relay_smoke.py` starts a temporary server and checks HTTP redirect plus WebSocket relaying. `benchmark_nfr.py` prints sample **latency** and **throughput** numbers (documented in `Technical report.md`).
+
+If you want numbers from a running server on another machine, pass its shared session URL with `--session-url` as shown above.
 
 ---
 

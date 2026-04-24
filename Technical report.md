@@ -105,21 +105,21 @@ A **single authoritative server** (or primary) receives all operations, **transf
 
 Measurements support **at least two** NFR families from **`Task 1/SRS.md`**: **responsiveness / latency** (NFR-P-01 area) and **throughput** as a proxy for **scalability headroom** under burst traffic (NFR-SC / performance).
 
-**Method:** Script `Implementation/tests/benchmark_nfr.py` starts **Uvicorn** on `127.0.0.1:8777`, samples **40** HTTP redirects and **40** WebSocket relay round-trips (two clients in-session), then **400** relay round-trips for throughput. **Environment:** single developer machine (local loopback); numbers **vary by hardware and OS**.
+**Method:** Script `Implementation/tests/benchmark_nfr.py` targets a shared session URL and samples **40** HTTP redirects and **40** WebSocket relay round-trips (two clients in-session), then **400** relay round-trips for throughput. For the run below, the relay server was on one laptop and the client benchmark was run from a second laptop against that shared session link. **Environment:** two developer machines on the same network; numbers **vary by hardware, OS, and network path**.
 
-**Sample run (2026-04-23, Apple Silicon class laptop, loopback):**
+**Sample run (2026-04-24, client laptop measuring a server on another laptop):**
 
 | Metric | Mean | Median | Min | Max |
 |--------|------|--------|-----|-----|
-| HTTP `GET /` (redirect) | **0.85 ms** | 0.54 ms | 0.34 ms | 10.77 ms |
-| WebSocket relay one-hop (5-byte frame) | **0.20 ms** | 0.18 ms | 0.16 ms | 0.28 ms |
+| HTTP `GET /` (redirect) | **43.086 ms** | 41.505 ms | 12.347 ms | 80.825 ms |
+| WebSocket relay one-hop (5-byte frame) | **14.676 ms** | 12.175 ms | 5.378 ms | 61.634 ms |
 
-**Throughput (same run):** **~7,170** relayed messages/s for **129-byte** binary frames (400 round-trips measured end-to-end between two clients).
+**Throughput (same run):** **~85.9** relayed messages/s for **129-byte** binary frames (400 round-trips measured end-to-end between two clients).
 
 **Interpretation:**
 
-1. **Latency (NFR-P-01 context):** On localhost, relay contribution is **well under 1 s** and **well under 500 ms**—the dominant factor in real deployments becomes **WAN RTT**, not Python fan-out for small sessions.
-2. **Throughput:** The relay sustains **thousands of small messages per second** between two peers, indicating headroom for typing bursts and awareness updates for **three** users before the prototype becomes network-bound.
+1. **Latency (NFR-P-01 context):** Even over the network between two laptops, relay contribution stays far below **1 s** and well below **500 ms**; the dominant factor in real deployments becomes network RTT, not Python fan-out for small sessions.
+2. **Throughput:** The relay sustains tens of small messages per second across the two-machine path, which is enough for a prototype collaboration demo and still leaves headroom for typing bursts and awareness updates for a small session.
 
 Re-run the script before submission if you want **your** machine’s figures in an appendix.
 
