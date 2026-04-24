@@ -1,7 +1,7 @@
 /**
  * SyncSpace client: Yjs + CodeMirror 6 with a minimal WebSocket provider.
- * Multi-file: Y.Map "files" maps path strings → Y.Text (paths may include folders: src/a.py).
  * Binary wire format: 0x00 + Yjs update, 0x01 + awareness update; JSON text for request_state.
+ * See Technical report.md and README.md.
  */
 import * as Y from 'yjs';
 import { yCollab } from 'y-codemirror.next';
@@ -35,13 +35,18 @@ class SimpleProvider {
     this.ws = new WebSocket(url);
     this.ws.binaryType = 'arraybuffer';
     
+    // UI Elements
     this.statusText = document.getElementById('connection-status');
     this.statusDot = document.getElementById('connection-dot');
 
     this.ws.onopen = () => {
       this.statusText.textContent = 'Connected';
       this.statusDot.classList.add('connected');
+      
+      // 1. Request the current document state from any existing peer
       this.ws.send(JSON.stringify({ type: 'request_state' }));
+
+      // 2. Broadcast our own initial awareness state (prefix 1 = awareness)
       this._sendAwarenessUpdate(
         awarenessProtocol.encodeAwarenessUpdate(this.awareness, [this.doc.clientID])
       );
@@ -50,7 +55,10 @@ class SimpleProvider {
     this.ws.onclose = () => {
       this.statusText.textContent = 'Disconnected';
       this.statusDot.classList.remove('connected');
-      setTimeout(() => window.location.reload(), 5000);
+      // Reconnect with backoff in a real app, keeping it simple here
+      setTimeout(() => {
+        window.location.reload();
+      }, 5000);
     };
 
     this._sendDocUpdate = (update) => {
@@ -72,30 +80,43 @@ class SimpleProvider {
         try {
           const msg = JSON.parse(event.data);
           if (msg.type === 'request_state') {
+            // A new peer joined. Send them the full state of our local document.
+            // (In a real app, to prevent spike loads, you'd elect a single peer to respond, 
+            // but for a small prototype, everyone sending it is fine because Yjs handles redundant updates optimally).
             this._sendDocUpdate(Y.encodeStateAsUpdate(this.doc));
             this._sendAwarenessUpdate(
               awarenessProtocol.encodeAwarenessUpdate(this.awareness, [this.doc.clientID])
             );
           }
         } catch (e) {
-          console.error('Failed to parse JSON msg', event.data);
+            console.error("Failed to parse JSON msg", event.data);
         }
       } else {
+        // Binary messages could be CRDT Document updates OR Awareness updates
+        // Since we combined them on the same connection indiscriminately, we could prefix them via bytes.
+        // But let's build a simple prefix system natively:
         const data = new Uint8Array(event.data);
         if (data[0] === 0) {
-          Y.applyUpdate(this.doc, data.slice(1), this);
+          // Document Update
+          const update = data.slice(1);
+          Y.applyUpdate(this.doc, update, this);
         } else if (data[0] === 1) {
-          awarenessProtocol.applyAwarenessUpdate(this.awareness, data.slice(1), this);
+          // Awareness Update
+          const update = data.slice(1);
+          awarenessProtocol.applyAwarenessUpdate(this.awareness, update, this);
         }
       }
     };
 
+    // Listen to local document changes and broadcast them
     doc.on('update', (update, origin) => {
+      // Do not broadcast changes that came from the network (origin === this)
       if (origin !== this) {
         this._sendDocUpdate(update);
       }
     });
 
+    // Listen to local awareness changes and broadcast them
     awareness.on('update', ({ added, updated, removed }) => {
       const changedClients = added.concat(updated, removed);
       this._sendAwarenessUpdate(
@@ -140,6 +161,7 @@ const ydoc = new Y.Doc({ clientID: storedClientId });
 const ytext = ydoc.getText('codemirror');
 const awareness = new awarenessProtocol.Awareness(ydoc);
 
+// Generate random user info
 const colors = ['#f87171', '#fb923c', '#fbbf24', '#34d399', '#38bdf8', '#818cf8', '#a78bfa', '#f472b6'];
 const randomColor = colors[Math.floor(Math.random() * colors.length)];
 const savedDisplayName = (localStorage.getItem(LS_DISPLAY_NAME) || '').trim();
@@ -163,42 +185,7 @@ awareness.setLocalStateField('user', {
   colorLight: randomColor + '33'
 });
 
-function persistDisplayName() {
-  let name = nameInput.value.trim();
-  if (!name) {
-    name = 'User_' + Math.floor(Math.random() * 1000);
-    nameInput.value = name;
-  }
-  localStorage.setItem(LS_NAME, name);
-  const u = awareness.getLocalState()?.user || {};
-  awareness.setLocalStateField('user', {
-    ...u,
-    name,
-    color: u.color || randomColor,
-    colorLight: (u.color || randomColor) + '33'
-  });
-}
-
-nameInput.addEventListener('change', persistDisplayName);
-nameInput.addEventListener('blur', persistDisplayName);
-nameInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    nameInput.blur();
-  }
-});
-
-const showCursorNamesEl = document.getElementById('show-cursor-names');
-const savedShowNames = localStorage.getItem(LS_CURSOR_NAMES);
-showCursorNamesEl.checked = savedShowNames === null ? true : savedShowNames === 'true';
-
-function applyCursorNameVisibility() {
-  document.body.classList.toggle('show-cursor-names', showCursorNamesEl.checked);
-  localStorage.setItem(LS_CURSOR_NAMES, String(showCursorNamesEl.checked));
-}
-showCursorNamesEl.addEventListener('change', applyCursorNameVisibility);
-applyCursorNameVisibility();
-
+// 2. Connect Provider
 const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const wsUrl = `${wsProto}//${window.location.host}/ws/${sessionId}`;
 const provider = new SimpleProvider(wsUrl, ydoc, awareness);
@@ -368,26 +355,29 @@ const participantsList = document.getElementById('participants-list');
 
 function updateParticipantsList() {
   participantsList.innerHTML = '';
+  
+  // Get all states (including our own)
   const states = Array.from(awareness.getStates().entries());
-  if (states.length === 0) {
+  
+  if(states.length === 0) {
     participantsList.innerHTML = '<div style="color:var(--text-secondary);font-size:0.875rem;">Only you</div>';
     return;
   }
+
   states.forEach(([clientId, state]) => {
     if (state.user) {
       const item = document.createElement('div');
       item.className = 'participant';
+      
       const avatar = document.createElement('div');
       avatar.className = 'avatar';
       avatar.style.backgroundColor = state.user.color;
       avatar.textContent = state.user.name.charAt(0).toUpperCase();
+      
       const name = document.createElement('span');
       name.className = 'p-name';
-      let label = state.user.name + (clientId === ydoc.clientID ? ' (You)' : '');
-      if (state.activeFile && typeof state.activeFile === 'string') {
-        label += ` · ${state.activeFile}`;
-      }
-      name.textContent = label;
+      name.textContent = state.user.name + (clientId === ydoc.clientID ? ' (You)' : '');
+      
       item.appendChild(avatar);
       item.appendChild(name);
       participantsList.appendChild(item);

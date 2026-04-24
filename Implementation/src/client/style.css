@@ -114,7 +114,7 @@ body {
 }
 
 .sidebar {
-  width: 288px;
+  width: 260px;
   background: var(--panel-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -362,9 +362,4 @@ body.show-cursor-names .yjs-cursor > div {
 
 #toast.show {
   transform: translateX(-50%) translateY(0);
-}
-
-#toast.toast-error {
-  border-color: rgba(248, 113, 113, 0.5);
-  color: #fecaca;
 }

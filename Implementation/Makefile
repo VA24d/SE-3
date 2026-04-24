@@ -1,13 +1,12 @@
 # SyncSpace — cross-platform tasks (needs GNU Make + Python).
 #
-# Windows: install "make" (e.g. choco install make, scoop install make, or Git Bash includes gmake).
-# Then from this directory:  make install   &&   make start
+# Windows: install "make" (e.g. choco install make, Scoop, or Git Bash / WSL).
+# From this directory:  make install   &&   make start
 #
-# macOS / Linux: GNU Make is standard; use:  make install && make start
+# macOS / Linux: GNU Make is standard.
 
 .DEFAULT_GOAL := help
 
-# Directory containing this Makefile (handles paths with spaces)
 HERE := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 
 ifeq ($(OS),Windows_NT)
@@ -32,12 +31,11 @@ help:
 	@echo "  make run         Same as start"
 	@echo "  make test-smoke  WebSocket relay smoke test (temporary server on 8765)"
 	@echo "  make test-bench  Local latency / throughput sample"
-	@echo "  make clean-venv  Remove .venv (Python shutil — works on Win/Mac/Linux)"
+	@echo "  make clean-venv  Remove .venv (Python — works on Win/Mac/Linux)"
 	@echo ""
 	@echo "Override port:  make start SYNCSPACE_PORT=9000"
 	@echo "This folder: $(HERE)"
 
-# Virtualenv interpreter (created on demand)
 $(VENV_PY):
 	$(SYSTEM_PY) -m venv "$(HERE)/.venv"
 

@@ -2,7 +2,7 @@
 
 **Course:** S26CS6.401 — Software Engineering  
 **Project:** SyncSpace — real-time collaborative code editor (CRDT + WebSocket relay)  
-**Repository:** [https://github.com/YOUR_ORG/YOUR_REPO](https://github.com/YOUR_ORG/YOUR_REPO) — replace with your team’s public GitHub URL before Moodle submission.
+**Repository:** [SE 3](https://github.com/VA24d/SE-3) 
 
 This report consolidates **design decisions**, **architecture**, **prototype implementation**, **quantitative analysis** against non-functional requirements, comparison to an **alternative architectural pattern**, **process reflections**, and **individual contributions**.
 
@@ -146,16 +146,7 @@ Re-run the script before submission if you want **your** machine’s figures in 
 
 ---
 
-## 9. Submission checklist (Moodle)
-
-- [ ] GitHub link updated (this document § title, `README.md`).
-- [ ] `Project3_<team_number>.pdf` / zip per course naming.
-- [ ] Individual contributions table filled in (§8).
-- [ ] Optional: attach or paste benchmark output from `benchmark_nfr.py` as appendix.
-
----
-
-## 10. References to repository artifacts
+## 9. References to repository artifacts
 
 - Requirements: `Task 1/SRS.md`, `Task 1/system.md`
 - Stakeholders: `Task 2/Stakeholders.md`

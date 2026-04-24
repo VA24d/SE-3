@@ -4,7 +4,7 @@ SyncSpace is a **real-time collaborative code editor** prototype. Multiple users
 
 **Course:** S26CS6.401 — Software Engineering (Project 3)
 
-**Repository (replace if you fork):** [https://github.com/YOUR_ORG/YOUR_REPO](https://github.com/YOUR_ORG/YOUR_REPO)
+**Repository (replace if you fork):** [SE 3](https://github.com/VA24d/SE-3)
 
 ---
 
@@ -20,9 +20,6 @@ SyncSpace is a **real-time collaborative code editor** prototype. Multiple users
 | `Implementation/start.sh` | One-command start on macOS / Linux (LAN + printed URLs) |
 | `Implementation/start.ps1` | One-command start on Windows (PowerShell) |
 | `Implementation/tests/` | Smoke and latency/throughput checks |
-| `Implementation/start.sh` | One-command start on macOS / Linux |
-| `Implementation/start.ps1` | One-command start on Windows (PowerShell) |
-| `Implementation/Makefile` | Cross-platform tasks: `make install`, `make start`, tests |
 | `Task 1/` | Requirements (SRS) and subsystem overview |
 | `Task 2/` | Stakeholders (IEEE 42010) and ADRs |
 | `Task 3/` | Architectural tactics and design patterns |
@@ -50,14 +47,9 @@ python3 -m venv .venv
 
 ```powershell
 cd Implementation
-.\install.ps1
-```
-
-Manual alternative:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\pip.exe install -r requirements.txt
+python3 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
 
 **macOS / Linux:**
@@ -112,27 +104,6 @@ cd Implementation\src\server
 ```
 
 Then open **[http://127.0.0.1:8080/](http://127.0.0.1:8080/)**. You are redirected to `/app/?session=…`. Open the same URL (or use **Share link**) in another window to collaborate in the same session.
-
-### Other devices on your Wi‑Fi / LAN
-
-By default the server listens only on **localhost** (`127.0.0.1`), so **phones and other computers cannot connect**.
-
-To allow same-network access, start with **`SYNCSPACE_HOST=0.0.0.0`** (listen on all interfaces), then on the other device open **`http://<your-computer’s-LAN-IP>:8080/`** (for example `http://192.168.1.42:8080/`). The page and WebSocket URLs use whatever host you opened, so collaboration works as long as firewalls allow **TCP 8080**.
-
-**macOS / Linux:**
-
-```bash
-cd Implementation/src/server
-SYNCSPACE_HOST=0.0.0.0 ../../.venv/bin/python server.py
-```
-
-**Windows (PowerShell):**
-
-```powershell
-cd Implementation\src\server
-$env:SYNCSPACE_HOST="0.0.0.0"
-..\..\.venv\Scripts\python.exe server.py
-```
 
 ---
 
