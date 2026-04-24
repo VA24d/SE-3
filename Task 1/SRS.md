@@ -16,7 +16,7 @@
 
 | ID       | Name             | Description                                                                                                        | Priority | Architecturally Significant |
 |----------|------------------|--------------------------------------------------------------------------------------------------------------------|----------|-----------------------------|
-| FR-SM-01 | Create Session   | A user shall be able to create a new collaboration session. The system generates a unique session ID and initializes a shared CRDT document on the relay server. | Must     | Yes — establishes the CRDT document lifecycle and WebSocket channel setup. |
+| FR-SM-01 | Create Session   | A user shall be able to create a new collaboration session. The system generates a unique session ID; each **client** initializes a **Yjs** shared document in the browser, and the relay only routes session-scoped **WebSocket** traffic (it does not hold the CRDT on the server). | Must     | Yes — establishes the CRDT document lifecycle and WebSocket channel setup. |
 | FR-SM-02 | Join Session     | A user shall join an existing session via a shared session link/ID. Upon joining, the client receives the full current document state within ≤ 3 seconds. | Must     | Yes — drives the state synchronization protocol design (full-state snapshot transfer). |
 | FR-SM-03 | Leave Session    | When a user disconnects (intentionally or due to network drop), the system detects the disconnection within ≤ 5 seconds via heartbeat timeout. | Must     | No |
 

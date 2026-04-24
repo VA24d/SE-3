@@ -35,7 +35,7 @@ Stakeholders, concerns, viewpoints, and views are documented in **`Task 2/Stakeh
 
 ### 3.2 Major design decisions (ADRs)
 
-Four decisions are recorded with a **Nygard-style** template in **`Task 2/ADR/`**:
+Eight **Nygard-style** ADRs are in **`Task 2/ADR/`** (see `ADR.md` for the index). The following are representative:
 
 | ADR | Decision |
 |-----|----------|
@@ -43,6 +43,10 @@ Four decisions are recorded with a **Nygard-style** template in **`Task 2/ADR/`*
 | ADR-002 | WebSocket over HTTP polling |
 | ADR-003 | Web editor over VS Code extension |
 | ADR-004 | Stateless relay over centralized document authority |
+| ADR-005 | Python and FastAPI for the relay service |
+| ADR-006 | Capability URLs for sessions (no login) in the prototype |
+| ADR-007 | No database for the MVP relay (ephemeral sessions) |
+| ADR-008 | Versioned relay/client WebSocket framing and implementation details |
 
 ### 3.3 Tactics and patterns
 
@@ -136,13 +140,13 @@ Re-run the script before submission if you want **your** machine’s figures in 
 
 ## 8. Individual contributions
 
-*Complete this table before submission. Only one member uploads to Moodle, but **everyone** should appear here.*
+**Team 33.** Only one member uploads to Moodle; this table must still list everyone with a substantive role. Entries below are aligned with **git history**; adjust wording if you split work differently.
 
 | Team member | Primary areas | Specific contributions |
 |-------------|---------------|------------------------|
-| *Name 1* | *e.g. relay, DevOps* | *e.g. FastAPI server, smoke tests* |
-| *Name 2* | *e.g. client, Yjs* | *e.g. SimpleProvider, CodeMirror integration* |
-| *Name 3* | *e.g. documentation* | *e.g. SRS, ADRs, technical report* |
+| Vijay A | Core implementation, build/run tooling, documentation integration | FastAPI relay and static hosting, Yjs/WebSocket client (`SimpleProvider` framing), Makefile/`start` scripts, README, stakeholder/ADR doc merges, cross-cutting fixes and project narrative. |
+| Aryan Mishra | Architecture and report | ADR and Technical report updates aligned with the as-built system. |
+| Hardik Chadha | Windows / setup | `install.ps1` and cross-platform install path alongside existing setup docs. |
 
 ---
 

@@ -17,11 +17,11 @@
 | C-01       | Real-time responsiveness         | Edits must propagate to all collaborators with low latency (≤ 1 second) so the experience feels "live." | SH-01         |
 | C-02       | Data consistency                 | All users must eventually see the exact same document state, with no silent data loss from concurrent edits. | SH-01, SH-02  |
 | C-03       | Ease of use                      | A new user should open the app, get a session, share a link, and start editing quickly, with optional syntax mode (Python, C++, Java) and a readable display name. | SH-01         |
-| C-04       | Fault tolerance                  | The system should tolerate temporary network loss: local editing continues where possible, and peers can help resync after reconnect. | SH-01, SH-04  |
+| C-04       | Fault tolerance                  | The system should tolerate temporary network loss: local editing continues where possible, and peers can help resync after reconnect. | SH-01, SH-03  |
 | C-05       | Architectural clarity            | The system architecture must be well-documented, follow established patterns, and demonstrate clear design rationale. | SH-02, SH-03  |
-| C-06       | Maintainability and testability  | The codebase must be modular with clean subsystem boundaries so it is easy to extend, debug, and test. | SH-03         |
-| C-07       | Deployment simplicity            | The relay must be easy to run (venv + one command or Makefile target) with minimal infrastructure dependencies. | SH-04         |
-| C-08       | Security                         | Session access relies on unlisted capability URLs (short random session ids); production hardening would add TLS (HTTPS/WSS) and stricter controls. | SH-01, SH-04  |
+| C-06       | Maintainability and testability  | The codebase must be modular with clean subsystem boundaries so it is easy to extend, debug, and test. | SH-02, SH-03  |
+| C-07       | Deployment simplicity            | The relay must be easy to run (venv + one command or Makefile target) with minimal infrastructure dependencies. | SH-02, SH-03  |
+| C-08       | Security                         | Session access relies on unlisted capability URLs (short random session ids); production hardening would add TLS (HTTPS/WSS) and stricter controls. | SH-01, SH-03  |
 
 ---
 
@@ -44,13 +44,13 @@ Following IEEE 42010, we define the following viewpoints to frame the stakeholde
 ### Viewpoint 3: Deployment Viewpoint
 
 - **Framed Concerns:** C-07 (deployment simplicity), C-08 (security)
-- **Stakeholders:** SH-04, SH-03
+- **Stakeholders:** SH-01, SH-02, SH-03
 - **Conventions:** Shows the runtime infrastructure — where components run, how they communicate over the network, and security boundaries. Uses deployment diagrams.
 
 ### Viewpoint 4: Reliability Viewpoint
 
 - **Framed Concerns:** C-02 (consistency), C-04 (fault tolerance)
-- **Stakeholders:** SH-01, SH-04
+- **Stakeholders:** SH-01, SH-02, SH-03
 - **Conventions:** Shows failure modes, recovery mechanisms, and the consistency guarantees provided by the CRDT layer. Uses scenario descriptions and failure-mode tables.
 
 ---
