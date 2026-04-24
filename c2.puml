@@ -1,0 +1,20 @@
+@startuml
+!include <C4/C4_Container>
+
+LAYOUT_WITH_LEGEND()
+
+System_Ext(User, "End User", "A human user interacting with the system.")
+System_Ext(CDN, "ESM CDN (esm.sh)", "External Content Delivery Network.")
+
+System_Boundary(system, "VA24d SE-3 Main Implementation System") {
+    Container(WebClient, "Web Client", "HTML, CSS, JavaScript (Yjs, CodeMirror)", "Provides the collaborative editing interface, maintains local CRDT state, and handles conflict resolution.")
+    Container(RelayServer, "Stateless Relay Server", "Python (FastAPI)", "Serves static client assets, provides share links, and blindly routes WebSocket messages between peers.")
+}
+
+Rel(User, WebClient, "Interacts with", "Browser")
+Rel(WebClient, RelayServer, "Requests static assets and API (/api/share-link)", "HTTPS")
+Rel(WebClient, RelayServer, "Broadcasts & receives state updates via", "WebSockets")
+Rel(WebClient, CDN, "Fetches dependencies dynamically", "HTTPS")
+Rel(RelayServer, WebClient, "Serves static assets and provides API responses", "HTTPS")
+
+@enduml

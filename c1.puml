@@ -1,0 +1,30 @@
+@startuml
+!include <C4/C4_Context>
+
+SHOW_PERSON_PORTRAIT()
+
+' Persons
+Person(endUser, "End User", "A user interacting with the web-based collaborative editor.")
+Person(devOps, "Developer / Administrator", "Responsible for deploying and managing the application server.")
+
+' External Systems
+System_Ext(webBrowser, "Web Browser", "Standard web browser (e.g., Chrome, Firefox, Safari) used by End Users.")
+System_Ext(pypi, "Python Package Repository", "Hosts Python libraries (FastAPI, WebSockets) required by the server.")
+System_Ext(cdn, "ESM CDN (esm.sh)", "Dynamically provides JavaScript dependencies (Yjs, CodeMirror) directly to the browser.")
+System_Ext(operatingSystem, "Operating System", "Provides the runtime environment for the application server and scripts.")
+
+' System Boundary for the main system
+System_Boundary(mainSystemBoundary, "VA24d SE-3 System") {
+    System(mainApplication, "SyncSpace Application", "Collaborative editor composed of a peer-driven CRDT client and a stateless Python relay server.")
+}
+
+' Relationships
+Rel(endUser, webBrowser, "Uses")
+Rel(webBrowser, mainApplication, "Loads client, syncs state via", "HTTPS / WebSockets")
+Rel(webBrowser, cdn, "Retrieves JS modules from", "HTTPS")
+Rel(mainApplication, pypi, "Retrieves dependencies from", "during setup")
+Rel(devOps, mainApplication, "Deploys & Manages", "using scripts")
+Rel(devOps, operatingSystem, "Interacts with", "to run startup scripts")
+Rel(mainApplication, operatingSystem, "Runs on")
+
+@enduml

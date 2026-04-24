@@ -1,0 +1,37 @@
+@startuml
+!include <C4/C4_Component>
+
+LAYOUT_WITH_LEGEND()
+
+' Container for the Web Client application (running in a web browser)
+Container_Boundary(webClient, "Web Client (app.js)") {
+    Component(appController, "App Controller", "JavaScript", "Initializes the editor, manages UI events (e.g., share, rename), and orchestrates the CRDT and WebSocket components.")
+    Component(editorUI, "Editor UI", "CodeMirror 6", "Renders the text editor interface, handles syntax highlighting, and captures local user modifications.")
+    Component(crdtEngine, "CRDT Engine", "Yjs", "Maintains local document state and cursor awareness, resolving conflicts autonomously without a central authority.")
+    Component(wsProvider, "WebSocket Provider", "JavaScript (SimpleProvider)", "Manages the WebSocket lifecycle, sending local binary updates and applying received remote updates.")
+
+    Rel(appController, editorUI, "Configures and mounts")
+    Rel(appController, crdtEngine, "Initializes document and awareness state")
+    Rel(appController, wsProvider, "Instantiates to synchronize state")
+    Rel(editorUI, crdtEngine, "Mutates local state on user input", "Y-CodeMirror bindings")
+    Rel(crdtEngine, editorUI, "Triggers UI updates on state changes", "Y-CodeMirror bindings")
+    Rel(wsProvider, crdtEngine, "Applies incoming remote updates")
+    Rel(crdtEngine, wsProvider, "Yields local updates for broadcast")
+}
+
+' Container for the Python Server application
+Container_Boundary(pythonServer, "Python Relay Server (server.py)") {
+    Component(httpRouter, "HTTP / Static Router", "FastAPI", "Serves static client files (HTML, CSS, JS) and handles the /api/share-link endpoint.")
+    Component(wsHandler, "WebSocket Handler", "FastAPI (@app.websocket)", "Accepts client connections, handles disconnects, and broadcasts incoming binary/text messages to all other peers.")
+    Component(sessionStore, "Session Tracker", "Python (defaultdict)", "In-memory dictionary tracking active WebSocket connection objects grouped by session ID.")
+
+    Rel(httpRouter, sessionStore, "Independent of", "Stateless HTTP")
+    Rel(wsHandler, sessionStore, "Registers and removes connections from")
+    Rel(wsHandler, sessionStore, "Looks up peers for broadcasting from")
+}
+
+' High-level communication between the two containers
+Rel(wsProvider, wsHandler, "Transmits raw CRDT updates", "WebSocket Protocol")
+Rel(appController, httpRouter, "Fetches static assets & APIs", "HTTPS")
+
+@enduml
