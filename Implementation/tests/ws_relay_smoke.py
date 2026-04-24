@@ -6,10 +6,17 @@ import sys
 import time
 from pathlib import Path
 
+from test_runtime import (
+    python_for_uvicorn_subprocess,
+    reexec_in_venv_if_better,
+    require_test_deps,
+)
+
 IMPL_ROOT = Path(__file__).resolve().parents[1]
 SERVER_DIR = IMPL_ROOT / "src" / "server"
 PORT = 8765
 WS_URI = f"ws://127.0.0.1:{PORT}/ws/smoke-session"
+_ENTRY = Path(__file__).resolve()
 
 
 async def relay_binary_ok():
@@ -50,9 +57,14 @@ def root_redirects_to_app():
 
 
 def main() -> int:
+    reexec_in_venv_if_better(_ENTRY)
+    err = require_test_deps()
+    if err is not None:
+        return err
+    py = python_for_uvicorn_subprocess()
     proc = subprocess.Popen(
         [
-            sys.executable,
+            py,
             "-m",
             "uvicorn",
             "server:app",

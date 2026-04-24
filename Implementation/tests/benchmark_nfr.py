@@ -13,9 +13,17 @@ import time
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from test_runtime import (
+    python_for_uvicorn_subprocess,
+    reexec_in_venv_if_better,
+    require_test_deps,
+    require_websockets,
+)
+
 IMPL_ROOT = Path(__file__).resolve().parents[1]
 SERVER_DIR = IMPL_ROOT / "src" / "server"
 PORT = 8777
+_ENTRY = Path(__file__).resolve()
 
 
 def parse_target_url(session_url: str | None):
@@ -97,13 +105,19 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    reexec_in_venv_if_better(_ENTRY)
+
     proc = None
     http_base, ws_uri, launched_local_server = parse_target_url(args.session_url)
 
     if launched_local_server:
+        err = require_test_deps()
+        if err is not None:
+            return err
+        py = python_for_uvicorn_subprocess()
         proc = subprocess.Popen(
             [
-                sys.executable,
+                py,
                 "-m",
                 "uvicorn",
                 "server:app",
@@ -120,6 +134,10 @@ def main() -> int:
         if proc.poll() is not None:
             print("Server failed to start.", file=sys.stderr)
             return 1
+    else:
+        err = require_websockets()
+        if err is not None:
+            return err
     try:
         http_ms = http_redirect_samples(http_base, 40)
         lat_ms = asyncio.run(ws_fanout_samples(ws_uri, 40))

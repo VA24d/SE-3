@@ -116,12 +116,12 @@ python tests/benchmark_nfr.py --session-url "http://HOST:PORT/app/?session=SESSI
 
 ## Automated checks
 
-With the venv activated and dependencies installed:
+Run these from `Implementation/` after `make install` (or a manual venv and `pip install -r requirements.txt`). You can use the system `python3` for the test commands: if `.venv` exists and your interpreter is missing `uvicorn` or `websockets`, the script **re-runs itself** with `Implementation/.venv` so the smoke server and the test client use the same environment. Activating the venv first is still fine.
 
 ```bash
 cd Implementation
-python tests/ws_relay_smoke.py
-python tests/benchmark_nfr.py
+python3 tests/ws_relay_smoke.py
+python3 tests/benchmark_nfr.py
 ```
 
 `ws_relay_smoke.py` starts a temporary server and checks HTTP redirect plus WebSocket relaying. `benchmark_nfr.py` prints sample **latency** and **throughput** numbers (documented in `Technical report.md`).
