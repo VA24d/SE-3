@@ -4,7 +4,7 @@ SyncSpace is a **real-time collaborative code editor** prototype. Multiple users
 
 **Course:** S26CS6.401 — Software Engineering (Project 3)
 
-**Repository (replace if you fork):** [https://github.com/YOUR_ORG/YOUR_REPO](https://github.com/YOUR_ORG/YOUR_REPO)
+**Repository (replace if you fork):** [SE 3](https://github.com/VA24d/SE-3)
 
 ---
 
