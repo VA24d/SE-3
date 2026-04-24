@@ -146,7 +146,7 @@ Re-run the script before submission if you want **your** machine’s figures in 
 |-------------|---------------|------------------------|
 | Vijay A | Core implementation, build/run tooling, documentation integration | FastAPI relay and static hosting, Yjs/WebSocket client (`SimpleProvider` framing), Makefile/`start` scripts, README, stakeholder/ADR doc merges, cross-cutting fixes and project narrative. |
 | Aryan Mishra | Architecture and report | ADR and Technical report updates aligned with the as-built system. |
-| Hardik Chadha | Windows / setup | `install.ps1` and cross-platform install path alongside existing setup docs. |
+| Hardik Chadha | Testing and Architecture Analysis | Implementation 2, Test nfr |
 
 ---
 
