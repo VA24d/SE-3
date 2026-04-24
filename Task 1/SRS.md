@@ -73,8 +73,8 @@
 | ID       | Metric                                        | Target              | Architecturally Significant |
 |----------|------------------------------------------------|---------------------|-----------------------------|
 | NFR-R-01 | Data convergence after network partition heals  | 100% (guaranteed)   | Yes — this is the core CRDT invariant: all replicas that receive the same set of updates will reach an identical **syntactic** state. Note: convergence does not guarantee **semantic** correctness — concurrent edits to overlapping regions may merge into unintended output (e.g. interleaved code blocks), requiring user review. |
-| NFR-R-02 | Client reconnection and resync time             | ≤ 5 seconds         | Yes — requires the relay server to maintain session state and support incremental resync via CRDT state vectors. |
-| NFR-R-03 | Offline edit buffering                          | ≥ 100 operations    | No |
+| NFR-R-02 | Client reconnection and resync time             | ≤ 5 seconds         | Yes — requires the relay to track active WebSocket connections per session, and uses **peer-driven state exchange** (`request_state` → peer replies with `encodeStateAsUpdate`) for incremental resync. The relay itself does not hold Yjs document state. |
+| NFR-R-03 | Offline edit buffering                          | ≥ 100 operations    | No — **Prototype caveat:** the current fault-tolerance mechanism uses a destructive page reload on WebSocket disconnect (see System.md § Communication Subsystem), which destroys the local `Y.Doc` and any buffered operations. This NFR is therefore **not achievable** in the current prototype; it would require replacing the page reload with a non-destructive reconnect loop. |
 
 ### 3.4 Security
 
@@ -135,4 +135,4 @@ The following requirements are the key architectural drivers for SyncSpace:
 | **FR-PA-01** (Live Cursors) | Requires the **Yjs Awareness protocol** — a secondary real-time channel for ephemeral state (cursor positions, user info) separate from the persistent document CRDT. |
 | **NFR-P-01** (≤ 1s E2E Latency) | Drives the choice of **WebSocket** transport over HTTP polling, and requires incremental CRDT update encoding (not full-state snapshots on every edit). |
 | **NFR-R-01** (100% Convergence) | This is the strongest architectural constraint — it eliminates any "best-effort" sync approach and requires a formally proven merge algorithm (Yjs/CRDT). |
-| **NFR-R-02** (Reconnection ≤ 5s) | Requires the relay to maintain session state and support **state-vector-based incremental sync** on reconnect rather than full document re-transfer. |
+| **NFR-R-02** (Reconnection ≤ 5s) | Requires the relay to track active sessions and uses **peer-driven state exchange** for catch-up on reconnect. The relay forwards a `request_state` message; an existing peer replies with a full or incremental Yjs state update. |

@@ -63,7 +63,7 @@ Four decisions are recorded with a **Nygard-style** template in **`Task 2/ADR/`*
 
 ### 4.2 Session and transport
 
-- Visiting `/` issues a **307** redirect to `/app/?session=<id>` (short UUID fragment).
+- Visiting `/` issues a **307** redirect to `/app/?session=<id>` (server-generated UUIDv4).
 - Clients open `ws://<host>/ws/<session_id>` (or `wss` when deployed with TLS).
 - **Binary protocol:** `0x00` + Yjs update, `0x01` + awareness update; **JSON** text is used only for `request_state` so new joiners can obtain a **full state** from existing peers (the server does not store document bytes).
 
