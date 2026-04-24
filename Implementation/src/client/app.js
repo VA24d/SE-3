@@ -7,22 +7,24 @@ import * as Y from 'yjs';
 import { yCollab } from 'y-codemirror.next';
 import * as awarenessProtocol from 'y-protocols/awareness';
 
-import { EditorState } from '@codemirror/state';
+import { EditorState, Compartment } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
+import { keymap } from '@codemirror/view';
+import { indentWithTab } from '@codemirror/commands';
 import { python } from '@codemirror/lang-python';
 import { java } from '@codemirror/lang-java';
 import { cpp } from '@codemirror/lang-cpp';
 import { oneDark } from '@codemirror/theme-one-dark';
 
-const LS_NAME = 'syncspace-display-name';
 const LS_LANG = 'syncspace-language';
-const LS_CURSOR_NAMES = 'syncspace-show-cursor-names';
-const LS_ACTIVE_FILE = 'syncspace-active-file';
+const LS_DISPLAY_NAME = 'syncspace-display-name';
+const LS_SHOW_CURSOR_NAMES = 'syncspace-show-cursor-names';
+const MAX_DISPLAY_NAME_LENGTH = 24;
 
 const LANG = {
   python: () => python(),
-  java: () => java(),
-  c: () => cpp()
+  cpp: () => cpp(),
+  java: () => java()
 };
 
 // Simple Custom WebSocket Provider to communicate with our stateless Python relay server
@@ -100,43 +102,24 @@ class SimpleProvider {
         awarenessProtocol.encodeAwarenessUpdate(this.awareness, changedClients)
       );
     });
+
+    // Clean up awareness on page unload so peers instantly drop us
+    window.addEventListener('beforeunload', () => {
+      awarenessProtocol.removeAwarenessStates(this.awareness, [this.doc.clientID], 'window unload');
+    });
+
+    // Heartbeat: re-broadcast our awareness every 15s so peers know we're alive.
+    this._heartbeat = setInterval(() => {
+      if (this.ws.readyState === WebSocket.OPEN) {
+        this._sendAwarenessUpdate(
+          awarenessProtocol.encodeAwarenessUpdate(this.awareness, [this.doc.clientID])
+        );
+      }
+    }, 15000);
   }
 }
 
-async function copyTextToClipboard(text) {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch (_) { /* fall through */ }
-  try {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.setAttribute('readonly', '');
-    ta.style.position = 'fixed';
-    ta.style.left = '-9999px';
-    document.body.appendChild(ta);
-    ta.select();
-    const ok = document.execCommand('copy');
-    document.body.removeChild(ta);
-    if (ok) return true;
-  } catch (_) { /* fall through */ }
-  window.prompt('Copy this session link:', text);
-  return false;
-}
-
-function showToast(message, isError = false) {
-  const toast = document.getElementById('toast');
-  toast.textContent = message;
-  toast.classList.toggle('toast-error', isError);
-  toast.classList.add('show');
-  setTimeout(() => {
-    toast.classList.remove('show');
-    toast.classList.remove('toast-error');
-  }, 2500);
-}
-
+// Ensure session exists
 const urlParams = new URLSearchParams(window.location.search);
 let sessionId = urlParams.get('session');
 if (!sessionId) {
@@ -144,35 +127,38 @@ if (!sessionId) {
   window.history.replaceState(null, '', `?session=${sessionId}`);
 }
 
-const ydoc = new Y.Doc();
-const filesMap = ydoc.getMap('files');
-
-function bootstrapFiles() {
-  ydoc.transact(() => {
-    if (filesMap.size > 0) return;
-    const nt = new Y.Text();
-    const legacy = ydoc.getText('codemirror');
-    if (legacy && legacy.length > 0) {
-      nt.insert(0, legacy.toString());
-    }
-    filesMap.set('main.py', nt);
-  });
+// 1. Initialize Yjs CRDT Document & Awareness
+// Persist clientID in sessionStorage so reloads reuse the same identity
+// instead of appearing as a second ghost user.
+const SS_CLIENT_ID = 'syncspace-clientid';
+let storedClientId = Number(sessionStorage.getItem(SS_CLIENT_ID));
+if (!storedClientId || storedClientId <= 0) {
+  storedClientId = Math.floor(Math.random() * 2147483647);
+  sessionStorage.setItem(SS_CLIENT_ID, storedClientId);
 }
-bootstrapFiles();
-
+const ydoc = new Y.Doc({ clientID: storedClientId });
+const ytext = ydoc.getText('codemirror');
 const awareness = new awarenessProtocol.Awareness(ydoc);
 
 const colors = ['#f87171', '#fb923c', '#fbbf24', '#34d399', '#38bdf8', '#818cf8', '#a78bfa', '#f472b6'];
 const randomColor = colors[Math.floor(Math.random() * colors.length)];
-
-const nameInput = document.getElementById('display-name');
-const storedName = localStorage.getItem(LS_NAME);
+const savedDisplayName = (localStorage.getItem(LS_DISPLAY_NAME) || '').trim();
 const randomName = 'User_' + Math.floor(Math.random() * 1000);
-const initialName = (storedName && storedName.trim()) ? storedName.trim() : randomName;
-nameInput.value = initialName;
+const initialDisplayName = savedDisplayName || randomName;
+
+function sanitizeDisplayName(raw) {
+  const normalized = String(raw || '').trim().replace(/\s+/g, ' ');
+  return normalized.slice(0, MAX_DISPLAY_NAME_LENGTH);
+}
+
+function getDefaultShareUrl() {
+  const url = new URL(window.location.href);
+  url.searchParams.set('session', sessionId);
+  return url.toString();
+}
 
 awareness.setLocalStateField('user', {
-  name: initialName,
+  name: initialDisplayName,
   color: randomColor,
   colorLight: randomColor + '33'
 });
@@ -217,177 +203,167 @@ const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const wsUrl = `${wsProto}//${window.location.host}/ws/${sessionId}`;
 const provider = new SimpleProvider(wsUrl, ydoc, awareness);
 
+const languageConf = new Compartment();
 const langSelect = document.getElementById('language-select');
 const savedLang = localStorage.getItem(LS_LANG);
 if (savedLang && LANG[savedLang]) {
   langSelect.value = savedLang;
 }
 
-const undoByPath = new Map();
-let currentPath = null;
-let view;
+// 3. Initialize CodeMirror Editor
+const langKey = langSelect.value in LANG ? langSelect.value : 'python';
+const state = EditorState.create({
+  doc: ytext.toString(),
+  extensions: [
+    basicSetup,
+    keymap.of([indentWithTab]),
+    languageConf.of(LANG[langKey]()),
+    oneDark,
+    yCollab(ytext, provider.awareness, { undoManager: new Y.UndoManager(ytext) })
+  ]
+});
 
-function sortedPaths() {
-  return Array.from(filesMap.keys()).sort();
-}
-
-function langKeyForPath(path) {
-  const lower = path.toLowerCase();
-  if (lower.endsWith('.py')) return 'python';
-  if (lower.endsWith('.java')) return 'java';
-  if (lower.endsWith('.c') || lower.endsWith('.h') || lower.endsWith('.cpp') || lower.endsWith('.cc')) return 'c';
-  return null;
-}
-
-function buildEditorState(ytext, path) {
-  let langKey = langSelect.value;
-  if (!LANG[langKey]) langKey = 'python';
-  if (!undoByPath.has(path)) {
-    undoByPath.set(path, new Y.UndoManager(ytext));
-  }
-  return EditorState.create({
-    doc: ytext.toString(),
-    extensions: [
-      basicSetup,
-      LANG[langKey](),
-      oneDark,
-      yCollab(ytext, awareness, { undoManager: undoByPath.get(path) })
-    ]
-  });
-}
-
-function pickInitialPath() {
-  const saved = localStorage.getItem(LS_ACTIVE_FILE);
-  if (saved && filesMap.has(saved)) return saved;
-  return sortedPaths()[0] || 'main.py';
-}
-
-function openFile(path) {
-  if (!filesMap.has(path)) return;
-  const ytext = filesMap.get(path);
-  currentPath = path;
-  localStorage.setItem(LS_ACTIVE_FILE, path);
-
-  const inferred = langKeyForPath(path);
-  if (inferred) {
-    langSelect.value = inferred;
-    localStorage.setItem(LS_LANG, inferred);
-  }
-
-  awareness.setLocalStateField('activeFile', path);
-  view.setState(buildEditorState(ytext, path));
-  renderFileList();
-}
-
-function removeFile(path) {
-  if (filesMap.size <= 1) {
-    showToast('Keep at least one file', true);
-    return;
-  }
-  ydoc.transact(() => filesMap.delete(path));
-  undoByPath.delete(path);
-  if (currentPath === path) {
-    const next = sortedPaths()[0];
-    if (next) openFile(next);
-  }
-  renderFileList();
-}
-
-function renderFileList() {
-  const el = document.getElementById('file-list');
-  el.innerHTML = '';
-  sortedPaths().forEach((path) => {
-    const row = document.createElement('div');
-    row.className = 'file-row' + (path === currentPath ? ' active' : '');
-    const nm = document.createElement('span');
-    nm.className = 'file-name';
-    nm.textContent = path;
-    nm.title = path;
-    row.appendChild(nm);
-    if (filesMap.size > 1) {
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'file-del';
-      del.textContent = '×';
-      del.title = 'Remove file';
-      del.addEventListener('click', (e) => {
-        e.stopPropagation();
-        removeFile(path);
-      });
-      row.appendChild(del);
-    }
-    row.addEventListener('click', () => openFile(path));
-    el.appendChild(row);
-  });
-}
-
-const initialPath = pickInitialPath();
-const initialYText = filesMap.get(initialPath);
-currentPath = initialPath;
-awareness.setLocalStateField('activeFile', initialPath);
-
-if (langKeyForPath(initialPath)) {
-  langSelect.value = langKeyForPath(initialPath);
-  localStorage.setItem(LS_LANG, langSelect.value);
-}
-
-view = new EditorView({
-  state: buildEditorState(initialYText, initialPath),
+const view = new EditorView({
+  state,
   parent: document.getElementById('editor')
 });
 
-renderFileList();
-
-filesMap.observe((event) => {
-  if (!filesMap.has(currentPath)) {
-    const next = sortedPaths()[0];
-    if (next) openFile(next);
-  }
-  renderFileList();
-});
-
 langSelect.addEventListener('change', () => {
-  const ytext = filesMap.get(currentPath);
-  if (!ytext) return;
-  localStorage.setItem(LS_LANG, langSelect.value);
-  if (currentPath) {
-    localStorage.setItem(LS_LANG + ':override', currentPath);
-  }
-  view.setState(buildEditorState(ytext, currentPath));
+  const key = langSelect.value;
+  if (!LANG[key]) return;
+  localStorage.setItem(LS_LANG, key);
+  view.dispatch({
+    effects: languageConf.reconfigure(LANG[key]())
+  });
 });
 
-document.getElementById('add-file-btn').addEventListener('click', () => {
-  const name = window.prompt(
-    'File path (folders ok: src/main.c, docs/notes.py)',
-    'untitled.py'
-  );
-  if (!name || !name.trim()) return;
-  const path = name.trim().replace(/^\/+/, '');
-  if (filesMap.has(path)) {
-    openFile(path);
+const toast = document.getElementById('toast');
+
+function showToast(message, durationMs = 2000, restoreText = 'Copied to clipboard!') {
+  toast.textContent = message;
+  toast.classList.add('show');
+  setTimeout(() => {
+    toast.classList.remove('show');
+    toast.textContent = restoreText;
+  }, durationMs);
+}
+
+function setDisplayName(nextName) {
+  const cleanName = sanitizeDisplayName(nextName);
+  if (!cleanName) return false;
+  const localState = awareness.getLocalState() || {};
+  const user = localState.user || {};
+  awareness.setLocalStateField('user', {
+    ...user,
+    name: cleanName
+  });
+  localStorage.setItem(LS_DISPLAY_NAME, cleanName);
+  return true;
+}
+
+// Clipboard API only works in a secure context (https / localhost). LAN http://IP needs execCommand fallback.
+function copyToClipboard(text) {
+  if (window.isSecureContext && navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise((resolve, reject) => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;left:0;top:0;width:2em;height:2em;opacity:0;';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    let ok = false;
+    try {
+      ok = document.execCommand('copy');
+    } finally {
+      document.body.removeChild(ta);
+    }
+    if (ok) resolve();
+    else reject(new Error('copy'));
+  });
+}
+
+// 4. Update UI Components — share uses server-built URL (LAN IP + port + /app/?session=…) so 127.0.0.1 is not copied
+const shareBtn = document.getElementById('share-btn');
+let shareUrl = getDefaultShareUrl();
+
+async function refreshShareUrl() {
+  try {
+    const res = await fetch(`/api/share-link?session=${encodeURIComponent(sessionId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.url) {
+        shareUrl = data.url;
+        return;
+      }
+    }
+  } catch {
+    // Keep the default URL.
+  }
+  shareUrl = getDefaultShareUrl();
+}
+
+// Resolve the server-built share URL up front so clipboard write stays in the click gesture path.
+refreshShareUrl();
+
+shareBtn.addEventListener('click', async () => {
+  try {
+    await copyToClipboard(shareUrl);
+    showToast('Copied to clipboard!');
+  } catch {
+    window.prompt('Copy this link:', shareUrl);
+    showToast('Copy failed. Link shown for manual copy.');
+  }
+  refreshShareUrl();
+});
+
+const displayNameInput = document.getElementById('display-name-input');
+const renameBtn = document.getElementById('rename-btn');
+
+displayNameInput.value = initialDisplayName;
+
+renameBtn.addEventListener('click', () => {
+  const nextValue = displayNameInput.value;
+  if (setDisplayName(nextValue)) {
+    displayNameInput.value = sanitizeDisplayName(nextValue);
+    showToast('Display name updated');
+    updateParticipantsList();
     return;
   }
-  ydoc.transact(() => {
-    filesMap.set(path, new Y.Text());
-  });
-  openFile(path);
+  const currentName = awareness.getLocalState()?.user?.name || initialDisplayName;
+  displayNameInput.value = currentName;
+  showToast('Please enter a valid display name');
 });
 
-document.getElementById('share-btn').addEventListener('click', async () => {
-  const url = window.location.href;
-  try {
-    const ok = await copyTextToClipboard(url);
-    if (ok) {
-      showToast('Copied to clipboard!');
-    } else {
-      showToast('Use the dialog to copy the link');
-    }
-  } catch (e) {
-    console.error(e);
-    showToast('Could not copy — try copying from the address bar', true);
+displayNameInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    renameBtn.click();
   }
 });
 
+const showCursorNamesInput = document.getElementById('show-cursor-names');
+const storedShowCursorNames = localStorage.getItem(LS_SHOW_CURSOR_NAMES);
+const initialShowCursorNames = storedShowCursorNames === null
+  ? true
+  : storedShowCursorNames === '1';
+
+function applyCursorNameVisibility(showNames) {
+  document.body.classList.toggle('show-cursor-names', showNames);
+  localStorage.setItem(LS_SHOW_CURSOR_NAMES, showNames ? '1' : '0');
+}
+
+showCursorNamesInput.checked = initialShowCursorNames;
+applyCursorNameVisibility(initialShowCursorNames);
+
+showCursorNamesInput.addEventListener('change', () => {
+  applyCursorNameVisibility(showCursorNamesInput.checked);
+});
+
+// Participant List tracking
 const participantsList = document.getElementById('participants-list');
 
 function updateParticipantsList() {

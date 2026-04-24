@@ -16,7 +16,9 @@ SyncSpace is a **real-time collaborative code editor** prototype. Multiple users
 | `Implementation/src/client/` | HTML/CSS/JS editor UI (ES modules + import maps) |
 | `Implementation/doc/arch/` | ADRs aligned with the implementation |
 | `Implementation/requirements.txt` | Python dependencies |
-| `Implementation/install.ps1` | One-command setup on Windows (venv + pip install) |
+| `Implementation/Makefile` | Cross-platform tasks (`make install`, `make start`, tests) |
+| `Implementation/start.sh` | One-command start on macOS / Linux (LAN + printed URLs) |
+| `Implementation/start.ps1` | One-command start on Windows (PowerShell) |
 | `Implementation/tests/` | Smoke and latency/throughput checks |
 | `Implementation/start.sh` | One-command start on macOS / Linux |
 | `Implementation/start.ps1` | One-command start on Windows (PowerShell) |
@@ -74,36 +76,24 @@ pip install -r requirements.txt
 
 Requires **GNU Make** and **Python** on the `PATH` (`python` on Windows, `python3` on macOS/Linux).
 
-From **`Implementation/`**:
+From **`Implementation/`** after `make install` (or manual venv + `pip install -r requirements.txt`):
 
 ```bash
 make install
 make start
 ```
 
-On **Windows**, use **PowerShell** or **cmd** from the `Implementation` folder; if `make` is missing, install it (e.g. `choco install make`, **Scoop**, or use **Git Bash** / **WSL** which ship with `make`).
+`make start` listens on **all interfaces** (`SYNCSPACE_HOST=0.0.0.0`) and prints **127.0.0.1** and **LAN** URLs. Override port: `make start SYNCSPACE_PORT=9000`. Localhost only: `make start SYNCSPACE_HOST=127.0.0.1`.
 
-Override the port: `make start SYNCSPACE_PORT=9000`.
+### Shell scripts
 
-### Quick start (shell scripts)
+From **`Implementation/`**:
 
-From **`Implementation/`** after venv + `pip install` (see above):
+**macOS / Linux:** `./start.sh` (after `chmod +x start.sh` if needed)
 
-**macOS / Linux:**
+**Windows (PowerShell):** `.\start.ps1`
 
-```bash
-./start.sh
-```
-
-**Windows (PowerShell):**
-
-```powershell
-.\start.ps1
-```
-
-This listens on **all interfaces** (`0.0.0.0`), prints **127.0.0.1** and **LAN** URLs, and starts the server. Override the port: `SYNCSPACE_PORT=9000 ./start.sh` or `$env:SYNCSPACE_PORT="9000"; .\start.ps1`.
-
-### Manual start
+### Manual run
 
 The server must be started with working directory `Implementation/src/server` so static files resolve to `../client`.
 

@@ -1,5 +1,4 @@
 # SyncSpace launcher for Windows (PowerShell).
-# Same idea as start.sh: listen on all interfaces, print URLs, run server.
 # Usage: .\start.ps1
 # Optional: $env:SYNCSPACE_PORT = "9000"; .\start.ps1
 

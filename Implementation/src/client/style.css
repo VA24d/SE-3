@@ -25,7 +25,7 @@ body {
     radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15), transparent 25%),
     radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.15), transparent 25%);
   color: var(--text-primary);
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -124,10 +124,9 @@ body {
   flex-direction: column;
   gap: 1.5rem;
   transition: transform 0.3s ease;
-}
-
-.sidebar-section {
-  margin-bottom: 1.25rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
 }
 
 .sidebar h3 {
@@ -139,7 +138,6 @@ body {
   margin-bottom: 0.75rem;
 }
 
-.text-input,
 .select-input {
   width: 100%;
   padding: 0.5rem 0.65rem;
@@ -149,125 +147,71 @@ body {
   color: var(--text-primary);
   font-size: 0.875rem;
   font-family: inherit;
+  cursor: pointer;
 }
 
-.text-input:focus,
 .select-input:focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
-.select-input {
-  cursor: pointer;
-}
-
-.toggle-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.65rem;
-  cursor: pointer;
-  font-size: 0.875rem;
-  color: var(--text-primary);
-  line-height: 1.35;
-}
-
-.toggle-row input {
-  margin-top: 0.2rem;
-  width: 1rem;
-  height: 1rem;
-  accent-color: var(--accent);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.toggle-label {
+.field-label {
+  display: block;
+  font-size: 0.78rem;
   color: var(--text-secondary);
-  font-weight: 500;
+  margin-bottom: 0.45rem;
+}
+
+.inline-control {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.text-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid var(--panel-border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.text-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
 }
 
 .mini-btn {
-  width: 100%;
-  margin-bottom: 0.5rem;
-  padding: 0.4rem 0.65rem;
-  border-radius: 6px;
   border: 1px solid var(--panel-border);
-  background: rgba(59, 130, 246, 0.2);
+  background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
   font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
-  font-family: inherit;
 }
 
 .mini-btn:hover {
-  background: rgba(59, 130, 246, 0.35);
+  background: rgba(255, 255, 255, 0.16);
 }
 
-.hint {
-  margin-top: 0.5rem;
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  line-height: 1.35;
-}
-
-.hint code {
-  font-family: 'Fira Code', monospace;
-  font-size: 0.68rem;
-  color: var(--text-primary);
-}
-
-.file-list-wrap {
-  max-height: 200px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.file-row {
+.checkbox-row {
+  margin-top: 0.7rem;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.78rem;
-  font-family: 'Fira Code', monospace;
+  gap: 0.55rem;
   color: var(--text-secondary);
-}
-
-.file-row:hover {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.file-row.active {
-  background: rgba(59, 130, 246, 0.18);
-  color: var(--text-primary);
-}
-
-.file-row .file-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.file-row .file-del {
-  opacity: 0.45;
-  border: none;
-  background: none;
-  color: inherit;
+  font-size: 0.825rem;
   cursor: pointer;
-  padding: 2px 6px;
-  font-size: 1.1rem;
-  line-height: 1;
-  flex-shrink: 0;
 }
 
-.file-row .file-del:hover {
-  opacity: 1;
-  color: #f87171;
+.checkbox-row input {
+  accent-color: var(--accent);
 }
 
 .participants-list {
@@ -311,8 +255,9 @@ body {
 /* Editor Area */
 .editor-wrapper {
   flex: 1;
+  min-width: 0;
   position: relative;
-  overflow: hidden;
+  overflow: auto;
   display: flex;
   flex-direction: column;
 }
@@ -333,6 +278,7 @@ body {
 
 .cm-scroller {
   font-family: 'Fira Code', 'JetBrains Mono', monospace !important;
+  overflow: auto !important;
 }
 
 .cm-gutters {
@@ -385,7 +331,6 @@ body {
   opacity: 1;
 }
 
-/* Always show remote user name above caret when enabled (sidebar toggle) */
 body.show-cursor-names .yjs-cursor > div {
   opacity: 1;
 }
