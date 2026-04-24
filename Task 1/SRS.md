@@ -27,7 +27,7 @@
 | FR-CE-01 | Local-First Editing | Every keystroke shall be immediately applied to the local CRDT replica so the user experiences zero perceivable input delay. | Must     | Yes — this is the core "local-first" architectural decision; edits are never blocked by the network. |
 | FR-CE-02 | Remote Sync        | Local edit operations shall be broadcast to all connected peers via the relay server. Remote peers shall see the changes within ≤ 1 second under normal network conditions. | Must     | Yes — determines the WebSocket message protocol and CRDT update vector format. |
 | FR-CE-03 | Conflict Resolution | When two or more users edit the same region concurrently, the CRDT merge function shall deterministically resolve the conflict so all replicas converge to an identical state. | Must     | Yes — this is the single most architecturally significant requirement; it justifies the choice of CRDT over OT. |
-| FR-CE-04 | Syntax Highlighting | The editor shall provide syntax highlighting for common programming languages (at minimum: JavaScript, Python, HTML/CSS). | Should   | No |
+| FR-CE-04 | Syntax Highlighting | The editor shall provide syntax highlighting for common programming languages (at minimum: Java, Python, C++). | Should   | No |
 
 ### 2.3 Presence Awareness
 
@@ -86,7 +86,7 @@
 | ID       | Requirement                                                        | Target        |
 |----------|--------------------------------------------------------------------|---------------|
 | NFR-U-01 | Time for a new user to start a collaborative session               | ≤ 60 seconds  |
-| NFR-U-02 | The editor shall not break standard keyboard shortcuts             | Mandatory     |
+| NFR-U-02 | The editor shall not break standard keyboard shortcuts             | Optional     |
 
 ---
 
