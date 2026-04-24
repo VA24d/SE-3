@@ -19,11 +19,14 @@ import os
 import socket
 import uuid
 from collections import defaultdict
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+
+_CLIENT_DIR = Path(__file__).resolve().parent.parent / "client"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -60,7 +63,7 @@ def _build_share_url(session_id: str) -> str:
     return f"http://{public_host}:{port}/app/?session={session_id}"
 
 
-app.mount("/app", StaticFiles(directory="../client", html=True), name="client")
+app.mount("/app", StaticFiles(directory=str(_CLIENT_DIR), html=True), name="client")
 
 
 @app.get("/")
