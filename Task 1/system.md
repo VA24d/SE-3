@@ -9,13 +9,13 @@ SyncSpace is decomposed into **five main subsystems**. Each subsystem has clear 
 **Role:** Provides the user-facing code editing interface and renders all visual collaboration elements.
 
 **Functionality:**
-- Hosts the code editor component (CodeMirror / Monaco) with syntax highlighting, line numbers, and standard editor features
+- Hosts the code editor (**CodeMirror 6**) with syntax highlighting (user-selectable **Python, C++, Java**), line numbers, and standard editing affordances
 - Renders remote users' cursors and selections as colored overlays
-- Displays the participant list and connection status indicator
-- Provides UI controls for sessions: **new session** via redirect from `/`, **join** via shared URL / query parameter, **Share link** copies the current URL
+- Displays the participant list, connection status, optional **display name** editing, and a toggle for **cursor name** visibility
+- Provides UI controls for sessions: **new session** via HTTP redirect from `/` to `/app/?session=…` (short id issued by the server), **join** via the same query parameter on a shared link; **Share link** fetches **`/api/share-link`** so the clipboard gets a **LAN-routable or public base URL** when configured, not only `127.0.0.1`
 - Captures local edit operations and forwards them to the CRDT Engine
 
-**Key Technologies:** HTML/CSS/JavaScript, **CodeMirror 6** (prototype)
+**Key Technologies:** HTML/CSS/JavaScript, **CodeMirror 6**, ES modules + import maps (CDN-hosted editor/CRDT packages)
 
 **Interfaces:**
 - → CRDT Engine: passes local edit operations, receives remote operations for rendering
@@ -72,9 +72,11 @@ SyncSpace is decomposed into **five main subsystems**. Each subsystem has clear 
 **Role:** Acts as a lightweight, stateless message router that forwards CRDT updates and awareness data between connected clients within a session.
 
 **Functionality:**
-- Accepts WebSocket connections from clients and groups them by **session ID** (path parameter)
+- Serves the static client under **`/app`** and redirects **`/`** to a new session URL
+- Exposes **`GET /api/share-link?session=…`** to build a copy-pasteable URL (optional env: `SYNCSPACE_PUBLIC_BASE`, `SYNCSPACE_PUBLIC_HOST`, `SYNCSPACE_PORT`)
+- Accepts WebSocket connections at **`/ws/{session_id}`** and groups peers by **session ID**
 - Forwards (**broadcasts**) each received **text or binary** frame to **all other** sockets in that session **unchanged**
-- Does **not** parse Yjs or awareness payloads; does **not** store the document
+- Does **not** parse Yjs or awareness payloads; does **not** persist the document
 - Maintains **only** an in-memory **set of active WebSockets per session**; when the last peer leaves, the session entry is removed
 
 **Key Technologies:** **Python 3**, **FastAPI**, **Uvicorn** (ASGI server)
@@ -126,14 +128,15 @@ SyncSpace is decomposed into **five main subsystems**. Each subsystem has clear 
 │  └──────────────┘   data      └──────┬───────┘       │
 │                                      │               │
 └──────────────────────────────────────┼───────────────┘
-                                       │ WSS
+                                       │ WebSocket (ws / wss)
                               ┌────────▼────────┐
                               │  Relay Server   │
                               │  (FastAPI)      │
                               │  - broadcast    │
                               │  - session mgmt │
+                              │  - /app static  │
                               └────────┬────────┘
-                                       │ WSS
+                                       │ WebSocket (ws / wss)
                     ┌──────────────────┼──────────────────┐
                     ▼                                     ▼
               ┌───────────┐                        ┌───────────┐
