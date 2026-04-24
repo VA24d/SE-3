@@ -145,4 +145,4 @@ The client talks to Yjs through stable library APIs; the wire format to the rela
 | Relay process restarts    | All sockets drop; clients follow the same reload/rejoin path. In-memory sessions are empty until clients return. | No server-side persistence (see ADR 7). |
 | Sole peer leaves          | If no peer remains, document state is not recoverable from the relay alone.                      | Acceptable for ephemeral MVP sessions. |
 
-The CRDT layer still provides the core guarantee that **concurrent edits do not corrupt the document**; the prototype prioritizes a small relay over durable server-side history or seamless long-lived WebSocket sessions without reload.
+The CRDT layer still provides the core guarantee that **concurrent edits converge to an identical syntactic state**; however, semantic correctness of the merged result is not guaranteed (e.g. interleaved code blocks from concurrent pastes) and requires user review. The prototype prioritizes a small relay over durable server-side history or seamless long-lived WebSocket sessions without reload.

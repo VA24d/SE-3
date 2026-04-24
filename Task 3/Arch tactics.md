@@ -33,6 +33,8 @@ The following architectural tactics are employed in SyncSpace to address specifi
 
 **Trade-off:** A full reload is heavier than incremental reconnect but is **simple and robust** for a semester prototype and keeps the client provider small.
 
+**Justification as controlled simplification:** This reload-based recovery is acceptable for the prototype because: (1) sessions are short-lived with ≤ 3 users, so the probability of all peers disconnecting simultaneously — and thus losing unsynced local edits during reload — is low; (2) the peer-assisted catch-up mechanism (Tactic 3) means a reloaded client can recover full document state from any surviving peer; (3) implementing in-process WebSocket reconnection with Y.Doc preservation would add significant client complexity without advancing the project's core architectural learning goals. A production system would replace the reload with graceful in-process reconnection.
+
 ---
 
 ## Tactic 3: Peer-Assisted State Catch-Up (Yjs State Encoding)

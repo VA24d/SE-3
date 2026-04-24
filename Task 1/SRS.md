@@ -66,11 +66,13 @@
 | NFR-SC-01 | Concurrent users per session         | 3          | 2           | Yes — affects relay server fan-out design and CRDT state vector size. |
 | NFR-SC-02 | Maximum document size with acceptable performance | 100 KB | 50 KB    | No |
 
+**Constraint rationale:** These limits reflect the scope of a semester course project, not empirically derived performance ceilings. The prototype is designed to demonstrate architectural concepts (CRDT-based collaboration, stateless relay) rather than to serve production workloads.
+
 ### 3.3 Reliability / Fault Tolerance
 
 | ID       | Metric                                        | Target              | Architecturally Significant |
 |----------|------------------------------------------------|---------------------|-----------------------------|
-| NFR-R-01 | Data convergence after network partition heals  | 100% (guaranteed)   | Yes — this is the core CRDT invariant. The system must never silently lose edits, even after disconnects. |
+| NFR-R-01 | Data convergence after network partition heals  | 100% (guaranteed)   | Yes — this is the core CRDT invariant: all replicas that receive the same set of updates will reach an identical **syntactic** state. Note: convergence does not guarantee **semantic** correctness — concurrent edits to overlapping regions may merge into unintended output (e.g. interleaved code blocks), requiring user review. |
 | NFR-R-02 | Client reconnection and resync time             | ≤ 5 seconds         | Yes — requires the relay server to maintain session state and support incremental resync via CRDT state vectors. |
 | NFR-R-03 | Offline edit buffering                          | ≥ 100 operations    | No |
 
@@ -87,6 +89,38 @@
 |----------|--------------------------------------------------------------------|---------------|
 | NFR-U-01 | Time for a new user to start a collaborative session               | ≤ 60 seconds  |
 | NFR-U-02 | The editor shall not break standard keyboard shortcuts             | Optional     |
+
+### 3.6 Measurement Methodology
+
+To ensure NFR targets are verifiable rather than aspirational, each performance and reliability metric will be measured as follows:
+
+| NFR | Measurement Method |
+|-----|-------------------|
+| NFR-P-01 (E2E sync ≤ 500 ms) | Run the relay server on one device and the benchmark script (`benchmark_nfr.py`) on a separate device on the same LAN. Measure WebSocket round-trip time for CRDT update vectors between two connected clients. |
+| NFR-P-02 (Keystroke latency ≤ 16 ms) | Instrument the client-side Yjs `Y.Doc` transaction with `performance.now()` timestamps before and after local apply. Sample across 100 keystrokes. |
+| NFR-P-03 (Convergence ≤ 1 s) | After a burst of concurrent edits from both clients, compare final document states across replicas and record the wall-clock time until convergence. |
+| NFR-R-02 (Reconnection ≤ 5 s) | Disconnect one client's WebSocket, measure wall-clock time from disconnection event to successful `request_state` completion on rejoin. |
+
+### 3.7 Trust Model
+
+The prototype operates under the following trust assumptions:
+
+- **All connected clients are trusted.** The relay server forwards CRDT and awareness payloads without inspection, parsing, or validation.
+- **No input validation on CRDT payloads.** A malicious or buggy client could send malformed Yjs updates, oversized messages, or high-frequency bursts. The relay does not defend against these.
+- **Known risks:** malformed updates causing replica divergence; memory exhaustion from oversized messages; denial of service via connection flooding.
+- **Scope:** These risks are accepted for the prototype, which targets trusted classroom / LAN environments. A production deployment would add payload-size limits, rate limiting, and schema validation on control messages.
+
+### 3.8 Documented Trade-offs
+
+The following trade-offs are conscious design choices for the prototype scope:
+
+| Trade-off | What we gain | What we accept |
+|-----------|-------------|----------------|
+| Ignoring semantic conflicts | Simpler CRDT merge with no application-level conflict UI | Users must manually review interleaved or nonsensical merged output |
+| Limited scalability (≤ 3 users, ≤ 100 KB) | Relay stays trivially simple; no sharding or load balancing | System is not validated for larger sessions or documents |
+| Simplified fault tolerance (page reload on disconnect) | Minimal client reconnection code | Unsynced local edits are lost on reload; no graceful in-process reconnect |
+| Ephemeral sessions (no persistence) | No database, no backup infrastructure | Document is lost when all clients disconnect |
+| No authentication / authorization | Zero-friction onboarding via capability URLs | No audit trail, no access revocation, no per-user controls |
 
 ---
 

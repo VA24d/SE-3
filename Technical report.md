@@ -74,7 +74,7 @@ The SRS mentions heartbeat timeouts, exponential backoff, and optional server-si
 - **Browser WebSocket** close events; on disconnect the client **reloads after 5 s** (simple recovery, not full backoff spec).
 - **Peer-to-peer state exchange** for new members instead of a server-held Y.Doc.
 
-These choices reduce server complexity and match **ADR-004**; they are called out so grading can distinguish **documentation vision** from **delivered prototype**.
+These choices reduce server complexity and match **ADR-004**; they are called out so grading can distinguish **documentation vision** from **delivered prototype**. The full set of consciously accepted trade-offs (ephemeral sessions, reload-based recovery, trusted-client assumption, semantic conflict blindspot) and the explicit trust model are documented in **`Task 1/SRS.md` §§ 3.7–3.8**.
 
 ---
 

@@ -56,6 +56,16 @@ SyncSpace is decomposed into **five main subsystems**. Each subsystem has clear 
 - Receives the same from peers **via the relay** and delivers them to the CRDT Engine / Awareness layer
 - **Prototype:** on unexpected disconnect, the client uses a **simple timed page reload** rather than a full exponential-backoff policy
 
+**Wire Protocol Summary:**
+
+| Frame type | Format | Direction | Purpose |
+|------------|--------|-----------|---------|
+| Document update | Binary: `0x00` + Yjs update bytes | Client ↔ Relay | CRDT state synchronization |
+| Awareness update | Binary: `0x01` + awareness payload bytes | Client ↔ Relay | Cursor/presence broadcasting |
+| State request | JSON text: `{"type": "request_state"}` | Joiner → Relay → Peers | New/reconnecting client requests full state from existing peers |
+
+**Limitation — Destructive Page Reload:** A page reload destroys the in-memory `Y.Doc` on that client. Any local edits not yet synced to at least one peer are permanently lost. A production system should reconnect the WebSocket while preserving the local `Y.Doc` instance rather than reloading the page.
+
 **Key Technologies:** Browser **WebSocket API**; **custom `SimpleProvider`** in the client; server uses **FastAPI** WebSockets
 
 **Interfaces:**
@@ -86,6 +96,8 @@ SyncSpace is decomposed into **five main subsystems**. Each subsystem has clear 
 - Internally: session registry (in-memory map of session ID → connected clients)
 
 **Architectural Significance:** The relay is intentionally **stateless** in terms of edit logic — it does not interpret, transform, or resolve edits. All conflict resolution happens at the CRDT layer on each client. This design avoids a central bottleneck and keeps the server simple.
+
+**Limitation — Session Loss:** Because the relay holds no document state, if all clients disconnect simultaneously the session's document is irrecoverable from the relay alone. This is an accepted prototype limitation (see ADR-007). Recovery depends entirely on at least one client retaining its local Y.Doc replica.
 
 ---
 
