@@ -16,13 +16,16 @@ import logging
 import os
 import socket
 import uuid
-from collections import defaultdict
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
+
+# Absolute path so StaticFiles works regardless of where uvicorn is launched from.
+_CLIENT_DIR = Path(__file__).resolve().parent.parent / "client"
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -158,7 +161,7 @@ def _build_share_url(session_id: str) -> str:
 
 # ── HTTP & static ─────────────────────────────────────────────────────────────
 
-app.mount("/app", StaticFiles(directory="../client", html=True), name="client")
+app.mount("/app", StaticFiles(directory=str(_CLIENT_DIR), html=True), name="client")
 
 
 @app.get("/")
