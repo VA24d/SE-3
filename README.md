@@ -20,6 +20,8 @@ SyncSpace is a **real-time collaborative code editor** prototype. Multiple users
 | `Implementation/start.sh` | One-command start on macOS / Linux (LAN + printed URLs) |
 | `Implementation/start.ps1` | One-command start on Windows (PowerShell) |
 | `Implementation/tests/` | Smoke and latency/throughput checks |
+| `Implementation2/` | **Alternate architecture (OT + central sequencer)** for comparison (port 8081) |
+| `Implementation3/` | **Alternate integration (HTTP Pub-Sub: POST + SSE)** vs Impl 1 WebSocket Mediator (port 8082) |
 | `Task 1/` | Requirements (SRS) and subsystem overview |
 | `Task 2/` | Stakeholders (IEEE 42010) and ADRs |
 | `Task 3/` | Architectural tactics and design patterns |

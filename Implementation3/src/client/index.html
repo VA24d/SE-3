@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncSpace (Impl 3 — Pub-Sub + SSE)</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <script type="importmap">
+    {
+      "imports": {
+        "yjs": "https://esm.sh/yjs@13.6.14",
+        "y-protocols/awareness": "https://esm.sh/y-protocols@1.0.6/awareness",
+        "y-codemirror.next": "https://esm.sh/y-codemirror.next@0.3.5?deps=yjs@13.6.14,y-protocols@1.0.6",
+        "@codemirror/state": "https://esm.sh/@codemirror/state",
+        "codemirror": "https://esm.sh/codemirror",
+        "@codemirror/lang-python": "https://esm.sh/@codemirror/lang-python",
+        "@codemirror/lang-java": "https://esm.sh/@codemirror/lang-java",
+        "@codemirror/lang-cpp": "https://esm.sh/@codemirror/lang-cpp",
+        "@codemirror/theme-one-dark": "https://esm.sh/@codemirror/theme-one-dark",
+        "@codemirror/view": "https://esm.sh/@codemirror/view",
+        "@codemirror/commands": "https://esm.sh/@codemirror/commands"
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <header class="top-bar">
+    <div class="brand">
+      <div class="brand-icon"></div>
+      SyncSpace
+      <span class="impl-badge" title="POST + SSE (Pub-Sub) instead of WebSocket Mediator">Impl 3</span>
+    </div>
+    <div class="session-info">
+      <div class="status-indicator">
+        <div id="connection-dot" class="dot"></div>
+        <span id="connection-status">Connecting...</span>
+      </div>
+      <button class="share-btn" id="share-btn" type="button">Share Link</button>
+    </div>
+  </header>
+
+  <main class="main-container">
+    <aside class="sidebar">
+      <div>
+        <h3>Syntax</h3>
+        <select id="language-select" class="select-input" aria-label="Syntax highlighting">
+          <option value="python">Python</option>
+          <option value="cpp">C++</option>
+          <option value="java">Java</option>
+        </select>
+      </div>
+      <div>
+        <h3>Profile</h3>
+        <label class="field-label" for="display-name-input">Display name</label>
+        <div class="inline-control">
+          <input id="display-name-input" class="text-input" type="text" maxlength="24" placeholder="Enter your name" aria-label="Display name">
+          <button id="rename-btn" class="mini-btn" type="button">Save</button>
+        </div>
+        <label class="checkbox-row" for="show-cursor-names">
+          <input id="show-cursor-names" type="checkbox">
+          <span>Always show cursor names</span>
+        </label>
+      </div>
+      <div>
+        <h3>Participants</h3>
+        <div id="participants-list" class="participants-list">
+        </div>
+      </div>
+    </aside>
+
+    <div class="editor-wrapper" id="editor">
+    </div>
+  </main>
+
+  <div id="toast">Copied to clipboard!</div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

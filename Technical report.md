@@ -103,6 +103,18 @@ A **single authoritative server** (or primary) receives all operations, **transf
 
 **Trade-off summary:** We traded a **powerful central coordinator** for **implementation simplicity** and **local-first UX**, which fits a semester prototype and NFR-P-02-style responsiveness. A production Google-Docs-scale system might combine CRDT/OT hybrids or richer server roles; that is out of scope here.
 
+### 5.3 Second alternative: same CRDT, different integration — Mediator (WebSocket) vs Publish–Subscribe (HTTP)
+
+The primary submission (**Implementation 1**) uses a **WebSocket Mediator** (Task 3): each client holds one **duplex** connection; the server forwards bytes between sockets. **`Implementation3/`** keeps **Yjs + the same document/awareness payloads** but implements **Publish–Subscribe** instead: clients **POST** an envelope to the server, and receive peer updates on a **Server-Sent Events (SSE)** subscription. The server is a per-session **topic broker** (queue per **connection id**), not a WebSocket endpoint.
+
+| Criterion | WebSocket Mediator (Impl 1) | HTTP POST + SSE (Impl 3) |
+|-----------|----------------------------|----------------------------|
+| Request style | Long-lived, bidirectional | Request/response (POST) + one-way **push** (SSE) |
+| Typical use | Low-latency, bursty binary streams | Firewalls that restrict WebSockets; simpler HTTP-only tooling — at the cost of **more HTTP overhead** and explicit **per-tab** send ordering in the client |
+| Server shape | `receive` / `send` on sockets | In-memory **fan-out to subscriber queues** |
+
+Rationale, trade-offs, and code pointers: **`Implementation3/doc/arch/pattern-swap-impl3.md`**, smoke test **`Implementation3/tests/sse_pubsub_smoke.py`**, default port **8082** (run separately from **8080** / **8081**).
+
 ---
 
 ## 6. Quantified non-functional properties (prototype)
@@ -157,4 +169,5 @@ Re-run the script before submission if you want **your** machine’s figures in 
 - ADRs: `Task 2/ADR/`
 - Tactics / patterns: `Task 3/Arch tactics.md`, `Task 3/Impl patterns.md`
 - Code: `Implementation/src/`
+- Optional comparison builds: `Implementation2/` (OT + sequencer), `Implementation3/` (pub-sub + SSE; pattern swap in §5.3)
 - Setup: **`README.md`**
