@@ -16,6 +16,7 @@ SyncSpace is a **real-time collaborative code editor** prototype. Multiple users
 | `Implementation/src/client/` | HTML/CSS/JS editor UI (ES modules + import maps) |
 | `Implementation/doc/arch/` | ADRs aligned with the implementation |
 | `Implementation/requirements.txt` | Python dependencies |
+| `Implementation/install.ps1` | One-command setup on Windows (venv + pip install) |
 | `Implementation/tests/` | Smoke and latency/throughput checks |
 | `Implementation/start.sh` | One-command start on macOS / Linux |
 | `Implementation/start.ps1` | One-command start on Windows (PowerShell) |
@@ -47,9 +48,14 @@ python3 -m venv .venv
 
 ```powershell
 cd Implementation
-python3 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+.\install.ps1
+```
+
+Manual alternative:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\pip.exe install -r requirements.txt
 ```
 
 **macOS / Linux:**
