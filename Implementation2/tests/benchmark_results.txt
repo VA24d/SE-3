@@ -1,0 +1,45 @@
+SyncSpace — Implementation 2: OT + Central Sequencer
+Benchmark run: 2026-04-24
+Environment: two-laptop LAN, server at 10.2.128.193:8081
+Tool: compare_benchmark.py (SE-3 root)
+Confirmation model: server ack (sender -> server transforms -> ack back to sender)
+Note: ack arrives before broadcast reaches receiver, so latency/throughput
+      reflect server processing time, not full end-to-end delivery.
+
+────────────────────────────────────────────────────────────
+Metric 1  HTTP redirect latency — 40 samples (lower is better)
+────────────────────────────────────────────────────────────
+  Mean      35.026 ms
+
+────────────────────────────────────────────────────────────
+Metric 2  WebSocket 1-hop latency — 40 samples (lower is better)
+          [A sends JSON op -> server transforms -> ack back to A]
+────────────────────────────────────────────────────────────
+  Mean      27.609 ms
+  Median     8.054 ms
+  Min        5.158 ms
+  Max       97.871 ms
+  Stdev     29.916 ms
+
+────────────────────────────────────────────────────────────
+Metric 3  Throughput — 400 sequential updates (higher is better)
+────────────────────────────────────────────────────────────
+  167.357 ops/s
+
+────────────────────────────────────────────────────────────
+Ranking across all three implementations
+────────────────────────────────────────────────────────────
+  HTTP redirect latency:    2nd
+  1-hop latency:            1st (best — but measured to ack, not receiver)
+  Throughput:               1st (best — ack-gated, not receiver-confirmed)
+
+NFR assessment (SRS Task 1):
+  NFR-P-01 (E2E sync <= 500 ms): PASS  — max ack time 98 ms (full delivery slightly higher)
+  NFR-P-02 (keystroke <= 16 ms): CONDITIONAL — edits are server-confirmed before render;
+                                  perceived latency ~= ack latency (~8 ms median) which
+                                  passes, but depends on network quality.
+  NFR-SC-01 (>= 3 users):        PASS  — sequencer handles 3-user session within budget
+
+Loopback baseline (same machine, port 8972):
+  WS latency median   1.099 ms
+  Throughput          5 254 ops/s

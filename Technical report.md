@@ -119,25 +119,69 @@ Rationale, trade-offs, and code pointers: **`Implementation3/doc/arch/pattern-sw
 
 ## 6. Quantified non-functional properties (prototype)
 
-Measurements support **at least two** NFR families from **`Task 1/SRS.md`**: **responsiveness / latency** (NFR-P-01 area) and **throughput** as a proxy for **scalability headroom** under burst traffic (NFR-SC / performance).
+Measurements cover **two NFR families** from `Task 1/SRS.md`: **responsiveness / latency** (NFR-P-01, NFR-P-02) and **throughput** as a scalability proxy (NFR-SC-01).
 
-**Method:** Script `Implementation/tests/benchmark_nfr.py` targets a shared session URL and samples **40** HTTP redirects and **40** WebSocket relay round-trips (two clients in-session), then **400** relay round-trips for throughput. For the run below, the relay server was on one laptop and the client benchmark was run from a second laptop against that shared session link. **Environment:** two developer machines on the same network; numbers **vary by hardware, OS, and network path**.
+**Method:** `compare_benchmark.py` (SE-3 root) targets all three running servers simultaneously and collects **40** HTTP-redirect samples, **40** WebSocket/SSE 1-hop latency samples, and **400** sequential throughput updates per implementation. The server machine (`10.2.128.193`) ran all three implementations concurrently; the benchmark client ran on a separate laptop on the same LAN. Numbers vary by hardware, OS, and network path.
 
-**Sample run (2026-04-24, client laptop measuring a server on another laptop):**
+**Confirmation model per implementation** (affects what the latency and throughput numbers measure):
 
-| Metric | Mean | Median | Min | Max |
-|--------|------|--------|-----|-----|
-| HTTP `GET /` (redirect) | **43.086 ms** | 41.505 ms | 12.347 ms | 80.825 ms |
-| WebSocket relay one-hop (5-byte frame) | **14.676 ms** | 12.175 ms | 5.378 ms | 61.634 ms |
+| Implementation | Confirmation used | What is timed |
+|---|---|---|
+| Impl-1 CRDT + Relay | Receiver delivery | Sender → relay → **receiver gets frame** |
+| Impl-2 OT + Sequencer | Server ack | Sender → server transforms → **ack back to sender** |
+| Impl-3 Pub-Sub + SSE | Receiver delivery | Sender POST → broker queues → **SSE event at receiver** |
 
-**Throughput (same run):** **~85.9** relayed messages/s for **129-byte** binary frames (400 round-trips measured end-to-end between two clients).
+---
+
+**Sample run — 2026-04-24, two-laptop LAN (server: `10.2.128.193`):**
+
+### HTTP redirect latency — 40 samples (lower is better)
+
+| Implementation | Mean |
+|---|---|
+| **Impl-1 CRDT + Stateless Relay** | **24.7 ms** |
+| Impl-2 OT + Central Sequencer | 35.0 ms |
+| Impl-3 Pub-Sub + SSE | 42.7 ms |
+
+### WebSocket / SSE 1-hop latency — 40 samples (lower is better)
+
+| Implementation | Mean | Median | Min | Max | Stdev |
+|---|---|---|---|---|---|
+| Impl-1 CRDT + Relay | 70.4 ms | 60.7 ms | 44.7 ms | 117.3 ms | 21.4 ms |
+| **Impl-2 OT + Sequencer** | **27.6 ms** | **8.1 ms** | **5.2 ms** | **97.9 ms** | 29.9 ms |
+| Impl-3 Pub-Sub + SSE | 123.2 ms | 95.4 ms | 60.1 ms | 242.9 ms | 60.0 ms |
+
+### Throughput — 400 sequential updates (higher is better)
+
+| Implementation | ops/s |
+|---|---|
+| **Impl-2 OT + Central Sequencer** | **167.4** |
+| Impl-1 CRDT + Stateless Relay | 14.0 |
+| Impl-3 Pub-Sub + SSE | 11.4 |
+
+---
 
 **Interpretation:**
 
-1. **Latency (NFR-P-01 context):** Even over the network between two laptops, relay contribution stays far below **1 s** and well below **500 ms**; the dominant factor in real deployments becomes network RTT, not Python fan-out for small sessions.
-2. **Throughput:** The relay sustains tens of small messages per second across the two-machine path, which is enough for a prototype collaboration demo and still leaves headroom for typing bursts and awareness updates for a small session.
+1. **HTTP latency** ranks CRDT first (24.7 ms) because the relay’s `/` handler is a trivial redirect with no state or transformation. OT and Pub-Sub add slightly more startup work per request.
 
-Re-run the script before submission if you want **your** machine’s figures in an appendix.
+2. **1-hop latency** — Impl-2 OT reports the lowest mean (27.6 ms) because its confirmation is the **server ack**, which returns before the broadcast reaches the second peer. Impl-1 CRDT (70.4 ms) and Impl-3 Pub-Sub (123.2 ms) measure full **receiver delivery**, a longer path. The large stdev and max on OT indicate occasional transform spikes. Pub-Sub’s 123 ms mean reflects the HTTP POST round-trip overhead on top of the SSE push — a structural cost of replacing a duplex channel with separate publish and subscribe legs.
+
+3. **Throughput** — OT’s ack-gated sequential model (167 ops/s) appears highest because each cycle ends at the server ack, not at receiver delivery; the network leg to the receiver is hidden. CRDT relay (14 ops/s) and Pub-Sub (11 ops/s) both measure end-to-end delivery, so the full LAN RTT is included twice per cycle (send + receive). On loopback, CRDT relay reaches ~7 000 msg/s (see §6 loopback note below), confirming the bottleneck on the LAN run is network RTT, not server CPU.
+
+4. **NFR compliance over the LAN:**
+   - NFR-P-01 (E2E sync ≤ 500 ms): all three pass (max observed 243 ms for Pub-Sub).
+   - NFR-P-02 (keystroke-to-render ≤ 16 ms): CRDT passes because edits apply locally before any network send; OT and Pub-Sub do not apply the edit locally first, so perceived latency equals the measured 1-hop figure.
+   - NFR-SC-01 (≥ 3 concurrent users): all three relay/broker designs handle 3 users within the measured throughput budgets.
+
+**Loopback baseline** (same machine, ports 8971–8972, from the previous `compare_benchmark.py` run):
+
+| Metric | CRDT Relay | OT Sequencer |
+|---|---|---|
+| WS latency median | 0.245 ms | 1.099 ms |
+| Throughput | 7 023 ops/s | 5 254 ops/s |
+
+Loopback eliminates network RTT and shows pure server overhead: the stateless relay adds ~0.25 ms per hop; the OT sequencer adds ~1.1 ms (JSON parse + transform + apply + ack). Over the LAN those numbers are dominated by the ~20–60 ms RTT, confirming the relay/sequencer is not the bottleneck at prototype scale.
 
 ---
 

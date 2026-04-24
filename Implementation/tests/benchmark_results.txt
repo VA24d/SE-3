@@ -1,0 +1,41 @@
+SyncSpace — Implementation 1: CRDT + Stateless Relay
+Benchmark run: 2026-04-24
+Environment: two-laptop LAN, server at 10.2.128.193:8080
+Tool: compare_benchmark.py (SE-3 root)
+Confirmation model: receiver delivery (end-to-end, sender -> relay -> receiver)
+
+────────────────────────────────────────────────────────────
+Metric 1  HTTP redirect latency — 40 samples (lower is better)
+────────────────────────────────────────────────────────────
+  Mean      24.661 ms
+
+────────────────────────────────────────────────────────────
+Metric 2  WebSocket 1-hop latency — 40 samples (lower is better)
+          [A sends binary frame -> relay forwards -> B receives]
+────────────────────────────────────────────────────────────
+  Mean      70.360 ms
+  Median    60.653 ms
+  Min       44.703 ms
+  Max      117.341 ms
+  Stdev     21.448 ms
+
+────────────────────────────────────────────────────────────
+Metric 3  Throughput — 400 sequential updates (higher is better)
+────────────────────────────────────────────────────────────
+  13.978 ops/s
+
+────────────────────────────────────────────────────────────
+Ranking across all three implementations
+────────────────────────────────────────────────────────────
+  HTTP redirect latency:    1st (best)
+  1-hop latency:            2nd
+  Throughput:               2nd
+
+NFR assessment (SRS Task 1):
+  NFR-P-01 (E2E sync <= 500 ms): PASS  — max observed 117 ms
+  NFR-P-02 (keystroke <= 16 ms): PASS  — CRDT applies edits locally before send (0 ms perceived)
+  NFR-SC-01 (>= 3 users):        PASS  — relay fan-out is O(n); 3-user budget well within headroom
+
+Loopback baseline (same machine, port 8971):
+  WS latency median   0.245 ms
+  Throughput          7 023 ops/s

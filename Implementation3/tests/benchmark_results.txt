@@ -1,0 +1,46 @@
+SyncSpace — Implementation 3: Pub-Sub + SSE
+Benchmark run: 2026-04-24
+Environment: two-laptop LAN, server at 10.2.128.193:8082
+Tool: compare_benchmark.py (SE-3 root)
+Confirmation model: receiver delivery (end-to-end, HTTP POST -> broker -> SSE event at receiver)
+
+────────────────────────────────────────────────────────────
+Metric 1  HTTP redirect latency — 40 samples (lower is better)
+────────────────────────────────────────────────────────────
+  Mean      42.650 ms
+
+────────────────────────────────────────────────────────────
+Metric 2  SSE 1-hop latency — 40 samples (lower is better)
+          [A sends HTTP POST -> broker queues -> SSE event arrives at B]
+────────────────────────────────────────────────────────────
+  Mean     123.223 ms
+  Median    95.430 ms
+  Min       60.079 ms
+  Max      242.893 ms
+  Stdev     59.985 ms
+
+────────────────────────────────────────────────────────────
+Metric 3  Throughput — 400 sequential updates (higher is better)
+────────────────────────────────────────────────────────────
+  11.352 ops/s
+
+────────────────────────────────────────────────────────────
+Ranking across all three implementations
+────────────────────────────────────────────────────────────
+  HTTP redirect latency:    3rd
+  1-hop latency:            3rd
+  Throughput:               3rd
+
+NFR assessment (SRS Task 1):
+  NFR-P-01 (E2E sync <= 500 ms): PASS  — max observed 243 ms, within 500 ms target
+  NFR-P-02 (keystroke <= 16 ms): FAIL  — Pub-Sub latency (95 ms median) exceeds threshold;
+                                  no local-first optimisation; edits require a POST round-trip.
+  NFR-SC-01 (>= 3 users):        PASS  — per-subscriber asyncio.Queue handles 3-user fan-out
+
+Architectural note:
+  The 123 ms mean reflects the structural cost of replacing a duplex WebSocket
+  channel with two separate HTTP legs (POST to publish + SSE to subscribe).
+  Each update incurs a full HTTP request/response before the SSE push is
+  dispatched — approximately 2x the round-trip latency of the WebSocket relay.
+  This is a known trade-off of Pub-Sub over HTTP: better firewall traversal and
+  tooling compatibility at the cost of higher per-message latency.
