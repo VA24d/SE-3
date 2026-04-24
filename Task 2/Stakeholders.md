@@ -66,8 +66,8 @@ The system is decomposed into five subsystems with the following data flow:
 ```
    User A's Browser                                User B's Browser
   ┌─────────────────┐                             ┌─────────────────┐
-  │ Editor Frontend │                            │ Editor Frontend │
-  │  (CodeMirror)   │                            │  (CodeMirror)   │
+  │ Editor Frontend │                             │ Editor Frontend │
+  │  (CodeMirror)   │                             │  (CodeMirror)   │
   └────────┬────────┘                             └────────┬────────┘
            │ local edits                                    │
   ┌────────▼────────┐                             ┌────────▼────────┐
