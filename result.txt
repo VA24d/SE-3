@@ -1,0 +1,67 @@
+Preparing benchmark targets...
+  Impl-1  CRDT + Stateless Relay  remote target: http://10.2.128.193:8080
+  Impl-2  OT + Central Sequencer  remote target: http://10.2.128.193:8081
+  Impl-3  Pub-Sub + SSE  remote target: http://10.2.128.193:8082
+  Targets ready.
+
+Benchmarking Impl-1  CRDT + Stateless Relay...
+  target: http://10.2.128.193:8080
+  HTTP latency... done.
+  WebSocket latency... done.
+  Throughput... done.
+
+Benchmarking Impl-2  OT + Central Sequencer...
+  target: http://10.2.128.193:8081
+  HTTP latency... done.
+  WebSocket latency... done.
+  Throughput... done.
+
+Benchmarking Impl-3  Pub-Sub + SSE...
+  target: http://10.2.128.193:8082
+  HTTP latency... done.
+  WebSocket latency... done.
+  Throughput... done.
+
+
+========================================================================================
+                           NFR Comparison (All Implementations)                         
+========================================================================================
+
+  Targets:
+    - Impl-1  CRDT + Stateless Relay @ http://10.2.128.193:8080
+    - Impl-2  OT + Central Sequencer @ http://10.2.128.193:8081
+    - Impl-3  Pub-Sub + SSE @ http://10.2.128.193:8082
+
+  HTTP redirect latency mean (40 samples, lower is better)
+    1. Impl-1  CRDT + Stateless Relay         24.661 ms
+    2. Impl-2  OT + Central Sequencer         35.026 ms
+    3. Impl-3  Pub-Sub + SSE                  42.650 ms
+    best: Impl-1  CRDT + Stateless Relay
+
+  Realtime 1-hop latency mean (40 samples, lower is better)
+    1. Impl-2  OT + Central Sequencer         27.609 ms
+    2. Impl-1  CRDT + Stateless Relay         70.360 ms
+    3. Impl-3  Pub-Sub + SSE                 123.223 ms
+    best: Impl-2  OT + Central Sequencer
+
+  Realtime 1-hop latency details (mean / median / min / max / stdev, ms):
+    - Impl-1  CRDT + Stateless Relay     70.360 / 60.653 / 44.703 / 117.341 / 21.448
+    - Impl-2  OT + Central Sequencer     27.609 / 8.054 / 5.158 / 97.871 / 29.916
+    - Impl-3  Pub-Sub + SSE              123.223 / 95.430 / 60.079 / 242.893 / 59.985
+
+  Throughput (400 sequential updates, higher is better)
+    1. Impl-2  OT + Central Sequencer        167.357 ops/s
+    2. Impl-1  CRDT + Stateless Relay         13.978 ops/s
+    3. Impl-3  Pub-Sub + SSE                  11.352 ops/s
+    best: Impl-2  OT + Central Sequencer
+
+  Throughput confirmation model:
+    - Impl-1  CRDT + Stateless Relay: receiver delivery
+    - Impl-2  OT + Central Sequencer: server ack
+    - Impl-3  Pub-Sub + SSE: receiver delivery
+
+----------------------------------------------------------------------------------------
+  Notes:
+    - HTTP and transport means are best when LOWER.
+    - Throughput is best when HIGHER.
+========================================================================================

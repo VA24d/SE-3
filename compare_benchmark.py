@@ -2,7 +2,7 @@
 """
 compare_benchmark.py — implementation-agnostic NFR benchmark.
 
-Runs the SAME three metrics against both implementations and prints a
+Runs the SAME three metrics against all implementations and prints a
 side-by-side comparison table.
 
   Metric 1  HTTP redirect latency          (40 samples each)
@@ -21,11 +21,19 @@ implements to match its wire protocol.
 Usage (from SE-3/ directory):
     python compare_benchmark.py
 
-Both venvs must be installed first:
+Remote servers (shared links from other laptops):
+    python compare_benchmark.py \
+      --impl1-url "http://10.0.0.21:8080/app/?session=abc123" \
+      --impl2-url "http://10.0.0.22:8081/app/?session=def456" \
+      --impl3-url "http://10.0.0.23:8082/app/?session=ghi789"
+
+All venvs must be installed first:
     cd Implementation  && make install
     cd Implementation2 && make install
+    cd Implementation3 && make install
 """
 
+import argparse
 import asyncio
 import http.client
 import json
@@ -35,7 +43,9 @@ import subprocess
 import sys
 import time
 from abc import ABC, abstractmethod
+from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlparse
 
 SE3_ROOT = Path(__file__).resolve().parent
 
@@ -106,13 +116,31 @@ class ImplDriver(ABC):
         Return updated state.
         """
 
+    @abstractmethod
+    def open_pair(self, session: str):
+        """Return an async context manager yielding (sender_endpoint, receiver_endpoint)."""
+
     # ── Shared helpers ────────────────────────────────────────────────────────
 
     def best_python(self) -> str:
-        return _best_python(self.venv_root, "uvicorn", "websockets")
+        return _best_python(self.venv_root, "uvicorn")
+
+    def http_base(self) -> str:
+        return getattr(self, "_http_base", f"http://127.0.0.1:{self.port}")
+
+    def configure_remote(self, app_url: str) -> None:
+        parsed = urlparse(app_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError(
+                f"Invalid URL for {self.name}: {app_url}. Expected http(s)://host[:port]/app/?session=..."
+            )
+        self._http_base = f"{parsed.scheme}://{parsed.netloc}"
+        ws_scheme = "wss" if parsed.scheme == "https" else "ws"
+        self._ws_base = f"{ws_scheme}://{parsed.netloc}/ws"
 
     def connect_uri(self, session: str) -> str:
-        return f"ws://127.0.0.1:{self.port}/ws/{session}"
+        ws_base = getattr(self, "_ws_base", f"ws://127.0.0.1:{self.port}/ws")
+        return f"{ws_base}/{session}"
 
 
 # ── CRDT driver (Implementation 1) ───────────────────────────────────────────
@@ -146,6 +174,14 @@ class CRDTDriver(ImplDriver):
         # Natural CRDT confirmation: peer received the frame.
         await ws_receiver.recv()
         return state
+
+    @asynccontextmanager
+    async def open_pair(self, session: str):
+        import websockets
+
+        uri = self.connect_uri(session)
+        async with websockets.connect(uri) as ws_a, websockets.connect(uri) as ws_b:
+            yield ws_a, ws_b
 
 
 # ── OT driver (Implementation 2) ─────────────────────────────────────────────
@@ -204,6 +240,93 @@ class OTDriver(ImplDriver):
         ack = await self._drain_until(ws_sender, "ack", timeout=5)
         return {**state, "rev": ack["rev"]}
 
+    @asynccontextmanager
+    async def open_pair(self, session: str):
+        import websockets
+
+        uri = self.connect_uri(session)
+        async with websockets.connect(uri) as ws_a, websockets.connect(uri) as ws_b:
+            yield ws_a, ws_b
+
+
+# ── SSE Pub-Sub driver (Implementation 3) ───────────────────────────────────
+
+class PubSubSSEDriver(ImplDriver):
+    """
+    Implementation 3: clients publish via HTTP POST and subscribe via SSE.
+    Confirmation = receiver subscriber gets one forwarded envelope.
+    """
+
+    name = "Impl-3  Pub-Sub + SSE"
+    port = 8973
+    server_dir = SE3_ROOT / "Implementation3" / "src" / "server"
+    server_env = {"SYNCSPACE_PUBSUB_PORT": "8973"}
+    venv_root = SE3_ROOT / "Implementation3" / ".venv"
+
+    def _stream_url(self, session: str) -> str:
+        return f"{self.http_base()}/api/sessions/{session}/stream"
+
+    def _publish_url(self, session: str) -> str:
+        return f"{self.http_base()}/api/sessions/{session}/publish"
+
+    @asynccontextmanager
+    async def open_pair(self, session: str):
+        import importlib
+
+        httpx_mod = importlib.import_module("httpx")
+        client = httpx_mod.AsyncClient(timeout=20.0)
+        qa: asyncio.Queue[dict] = asyncio.Queue()
+        qb: asyncio.Queue[dict] = asyncio.Queue()
+        ready_a = asyncio.Event()
+        ready_b = asyncio.Event()
+        conn_a = f"bench-a-{session}"
+        conn_b = f"bench-b-{session}"
+
+        async def stream_worker(conn_id: str, q: asyncio.Queue, ready: asyncio.Event):
+            params = {"connection_id": conn_id, "client_id": 1}
+            async with client.stream("GET", self._stream_url(session), params=params) as resp:
+                resp.raise_for_status()
+                ready.set()
+                async for line in resp.aiter_lines():
+                    if not line or not line.startswith("data: "):
+                        continue
+                    try:
+                        q.put_nowait(json.loads(line[6:]))
+                    except json.JSONDecodeError:
+                        continue
+
+        task_a = asyncio.create_task(stream_worker(conn_a, qa, ready_a))
+        task_b = asyncio.create_task(stream_worker(conn_b, qb, ready_b))
+        try:
+            await asyncio.wait_for(asyncio.gather(ready_a.wait(), ready_b.wait()), timeout=5)
+            sender = {"client": client, "connection_id": conn_a, "session": session, "queue": qa}
+            receiver = {"client": client, "connection_id": conn_b, "session": session, "queue": qb}
+            yield sender, receiver
+        finally:
+            task_a.cancel()
+            task_b.cancel()
+            await asyncio.gather(task_a, task_b, return_exceptions=True)
+            await client.aclose()
+
+    async def init_pair(self, ws_a, ws_b) -> dict:
+        return {}
+
+    async def send_edit(self, ws, state: dict) -> dict:
+        payload = {
+            "from_connection": ws["connection_id"],
+            "envelope": {"kind": "json", "text": '{"type":"bench","x":1}'},
+        }
+        resp = await ws["client"].post(self._publish_url(ws["session"]), json=payload)
+        resp.raise_for_status()
+        return state
+
+    async def recv_broadcast(self, ws) -> None:
+        await asyncio.wait_for(ws["queue"].get(), timeout=5)
+
+    async def throughput_confirm(self, ws_sender, ws_receiver, state: dict) -> dict:
+        await asyncio.wait_for(ws_receiver["queue"].get(), timeout=5)
+        return state
+
 
 # ── Server lifecycle ──────────────────────────────────────────────────────────
 
@@ -234,12 +357,16 @@ def stop_server(proc: subprocess.Popen) -> None:
 
 # ── Metric 1: HTTP redirect latency ──────────────────────────────────────────
 
-def http_latency_samples(port: int, n: int = 40) -> list[float]:
+def http_latency_samples(http_base: str, n: int = 40) -> list[float]:
     """GET / and measure round-trip until the redirect response is fully read."""
+    parsed = urlparse(http_base)
+    conn_cls = http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
+    host = parsed.hostname
+    port = parsed.port
     times_ms = []
     for _ in range(n):
         t0 = time.perf_counter()
-        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        conn = conn_cls(host, port, timeout=5)
         conn.request("GET", "/")
         conn.getresponse().read()
         conn.close()
@@ -255,12 +382,9 @@ async def ws_latency_samples(driver: ImplDriver, n: int = 40) -> list[float]:
     Clock starts just before A sends; stops when B receives the broadcast.
     This is identical for both drivers — protocol differences are in the hooks.
     """
-    import websockets
-
     lat_ms = []
     for i in range(n):
-        uri = driver.connect_uri(f"bench-lat-{i}")
-        async with websockets.connect(uri) as ws_a, websockets.connect(uri) as ws_b:
+        async with driver.open_pair(f"bench-lat-{i}") as (ws_a, ws_b):
             state = await driver.init_pair(ws_a, ws_b)
             t0 = time.perf_counter()
             await driver.send_edit(ws_a, state)
@@ -282,10 +406,7 @@ async def ws_throughput(driver: ImplDriver, count: int = 400) -> float:
       CRDT — wait for receiver to get each frame  (natural flow)
       OT   — wait for server ack before each send  (protocol requirement)
     """
-    import websockets
-
-    uri = driver.connect_uri("bench-tput")
-    async with websockets.connect(uri) as ws_a, websockets.connect(uri) as ws_b:
+    async with driver.open_pair("bench-tput") as (ws_a, ws_b):
         state = await driver.init_pair(ws_a, ws_b)
         t0 = time.perf_counter()
         for _ in range(count):
@@ -321,62 +442,70 @@ def print_comparison(
     lat_stats:  list[dict],
     tputs:      list[float],
 ) -> None:
-    d0, d1 = drivers
-    s0, s1 = lat_stats
-    h0, h1 = http_stats
+    sep = "=" * 88
+    thin = "-" * 88
 
-    W = 72
-    col = 18
+    def _print_block(title: str, values: list[tuple[str, float]], lower_is_better: bool, unit: str):
+        print()
+        print(f"  {title}")
+        ranked = sorted(values, key=lambda x: x[1], reverse=not lower_is_better)
+        for idx, (name, value) in enumerate(ranked, start=1):
+            print(f"    {idx}. {name:<34} {value:10.3f} {unit}")
+        print(f"    best: {ranked[0][0]}")
 
-    def row(label, v0, v1, unit="ms", higher_is_better=False):
-        ratio = v1 / v0 if v0 else float("nan")
-        if higher_is_better:
-            winner = "<-- faster" if v0 > v1 else ("faster -->" if v1 > v0 else "  equal")
+    print()
+    print(sep)
+    print(f"  {'NFR Comparison (All Implementations)':^{len(sep)-2}}")
+    print(sep)
+
+    print()
+    print("  Targets:")
+    for d in drivers:
+        print(f"    - {d.name} @ {d.http_base()}")
+
+    _print_block(
+        "HTTP redirect latency mean (40 samples, lower is better)",
+        [(d.name, s["mean"]) for d, s in zip(drivers, http_stats)],
+        lower_is_better=True,
+        unit="ms",
+    )
+
+    _print_block(
+        "Realtime 1-hop latency mean (40 samples, lower is better)",
+        [(d.name, s["mean"]) for d, s in zip(drivers, lat_stats)],
+        lower_is_better=True,
+        unit="ms",
+    )
+
+    print()
+    print("  Realtime 1-hop latency details (mean / median / min / max / stdev, ms):")
+    for d, s in zip(drivers, lat_stats):
+        print(
+            f"    - {d.name:<34} "
+            f"{s['mean']:.3f} / {s['median']:.3f} / {s['min']:.3f} / {s['max']:.3f} / {s['stdev']:.3f}"
+        )
+
+    _print_block(
+        "Throughput (400 sequential updates, higher is better)",
+        [(d.name, t) for d, t in zip(drivers, tputs)],
+        lower_is_better=False,
+        unit="ops/s",
+    )
+
+    print()
+    print("  Throughput confirmation model:")
+    for d in drivers:
+        if isinstance(d, OTDriver):
+            note = "server ack"
         else:
-            winner = "<-- faster" if v0 < v1 else ("faster -->" if v1 < v0 else "  equal")
-        print(f"  {label:<26} {v0:{col}.3f} {unit}   {v1:{col}.3f} {unit}   {ratio:.2f}x  {winner}")
-
-    sep = "=" * W
-    thin = "-" * W
-
-    print()
-    print(sep)
-    print(f"  {'NFR Comparison':^{W-2}}")
-    print(sep)
-    print(f"  {'Metric':<26} {d0.name:<{col+4}} {d1.name:<{col+4}} Ratio")
-    print(thin)
-
-    print()
-    print(f"  HTTP redirect latency — 40 samples (lower is better)")
-    row("  mean",   h0["mean"],   h1["mean"])
-    row("  median", h0["median"], h1["median"])
-
-    print()
-    print(f"  WebSocket 1-hop latency — 40 samples, fresh session per sample (lower is better)")
-    print(f"  [A sends one edit -> B receives it, clock covers send + relay/xform + recv]")
-    row("  mean",   s0["mean"],   s1["mean"])
-    row("  median", s0["median"], s1["median"])
-    row("  min",    s0["min"],    s1["min"])
-    row("  max",    s0["max"],    s1["max"])
-    row("  stdev",  s0["stdev"],  s1["stdev"])
-
-    print()
-    print(f"  Throughput — 400 sequential edits, persistent session (higher is better)")
-    confirm_note = [
-        "receiver delivery (fire-and-forward)",
-        "server ack (OT protocol constraint)",
-    ]
-    for i, (d, t, note) in enumerate(zip(drivers, tputs, confirm_note)):
-        print(f"  [{d.name}]  confirmation: {note}")
-    ratio_t = tputs[0] / tputs[1] if tputs[1] else float("nan")
-    winner_t = "<-- higher" if tputs[0] > tputs[1] else "higher -->"
-    print(f"  {'  ops/s':<26} {tputs[0]:{col}.1f} ops/s {tputs[1]:{col}.1f} ops/s {ratio_t:.2f}x  {winner_t}")
+            note = "receiver delivery"
+        print(f"    - {d.name}: {note}")
 
     print()
     print(thin)
-    print("  Ratio column: Impl-1 / Impl-2.  >1 = Impl-1 is higher for that metric.")
-    print("  For latency (lower=better): ratio >1 means Impl-1 is SLOWER.")
-    print("  For throughput (higher=better): ratio >1 means Impl-1 is FASTER.")
+    print("  Notes:")
+    print("    - HTTP and transport means are best when LOWER.")
+    print("    - Throughput is best when HIGHER.")
     print(sep)
     print()
 
@@ -384,30 +513,57 @@ def print_comparison(
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Compare Implementation 1, 2, and 3 NFR metrics.")
+    parser.add_argument(
+        "--impl1-url",
+        help="Shared URL for Implementation 1 server (http(s)://host[:port]/app/?session=...). If set, no local Impl-1 server is started.",
+    )
+    parser.add_argument(
+        "--impl2-url",
+        help="Shared URL for Implementation 2 server (http(s)://host[:port]/app/?session=...). If set, no local Impl-2 server is started.",
+    )
+    parser.add_argument(
+        "--impl3-url",
+        help="Shared URL for Implementation 3 server (http(s)://host[:port]/app/?session=...). If set, no local Impl-3 server is started.",
+    )
+    args = parser.parse_args()
+
     # Check websockets is available in THIS interpreter (needed for the async
     # benchmark coroutines that run in-process, not in a subprocess).
-    if not _has_deps(sys.executable, "websockets"):
+    required_runtime = ("websockets", "httpx")
+    if not _has_deps(sys.executable, *required_runtime):
         # Try to re-exec with a venv that has it.
-        for impl in ("Implementation", "Implementation2"):
+        for impl in ("Implementation", "Implementation2", "Implementation3"):
             venv = SE3_ROOT / impl / ".venv"
             py = _venv_python(venv)
-            if py and _has_deps(py, "websockets"):
+            if py and _has_deps(py, *required_runtime):
                 os.execv(py, [py, str(Path(__file__).resolve()), *sys.argv[1:]])
         sys.exit(
-            "The 'websockets' package is required.\n"
+            "Required packages not found in this interpreter: websockets, httpx.\n"
             "Run:  cd Implementation && make install\n"
+            "Run:  cd Implementation3 && make install\n"
             "Then: python compare_benchmark.py"
         )
 
-    drivers: list[ImplDriver] = [CRDTDriver(), OTDriver()]
+    drivers: list[ImplDriver] = [CRDTDriver(), OTDriver(), PubSubSSEDriver()]
     procs: list[subprocess.Popen] = []
 
-    print("Starting servers...")
+    if args.impl1_url:
+        drivers[0].configure_remote(args.impl1_url)
+    if args.impl2_url:
+        drivers[1].configure_remote(args.impl2_url)
+    if args.impl3_url:
+        drivers[2].configure_remote(args.impl3_url)
+
+    print("Preparing benchmark targets...")
     try:
         for d in drivers:
-            print(f"  {d.name}  (port {d.port})")
+            if hasattr(d, "_http_base"):
+                print(f"  {d.name}  remote target: {d.http_base()}")
+                continue
+            print(f"  {d.name}  local server on port {d.port}")
             procs.append(start_server(d))
-        print("  Both servers ready.")
+        print("  Targets ready.")
         print()
 
         results_http: list[dict] = []
@@ -416,8 +572,9 @@ def main() -> int:
 
         for d in drivers:
             print(f"Benchmarking {d.name}...")
+            print(f"  target: {d.http_base()}")
             print("  HTTP latency...", end=" ", flush=True)
-            http_ms = http_latency_samples(d.port, n=40)
+            http_ms = http_latency_samples(d.http_base(), n=40)
             print("done.")
 
             print("  WebSocket latency...", end=" ", flush=True)
