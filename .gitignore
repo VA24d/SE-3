@@ -1,0 +1,4 @@
+Implementation/src/server/__pycache__/*
+Implementation/src/client/__pycache__/*
+Implementation/src/server/*.pyc
+Implementation/tests/__pycache__/*.pyc
