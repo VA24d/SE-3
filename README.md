@@ -2,9 +2,9 @@
 
 SyncSpace is a **real-time collaborative code editor** prototype. Multiple users join a shared **session** in the browser, edit the same document with **CodeMirror 6**, and see each other’s cursors and names. The shared text is synchronized with **Yjs** (a CRDT); a small **Python** server only **relays** WebSocket messages and does not interpret document content.
 
-**Course:** S26CS6.401 — Software Engineering (Project 3)
+**Course:** S26CS6.401 — Software Engineering (Project 3) - Spring of '26
 
-**Repository (replace if you fork):** [SE 3](https://github.com/VA24d/SE-3)
+**Repository:** [SE 3](https://github.com/VA24d/SE-3)
 
 ---
 
@@ -143,4 +143,4 @@ If you want numbers from a running server on another machine, pass its shared se
 
 ## License / academic use
 
-Submitted as coursework; adapt reuse policies to your institution’s rules.
+Submitted as coursework for the SE course Spring '26 @ IIIT ; adapt reuse policies to your institution’s rules.
